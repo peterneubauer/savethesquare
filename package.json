@@ -1,0 +1,20 @@
+{
+  "name": "save-the-square",
+  "version": "1.0.0",
+  "description": "Save The Square - Donate to preserve Ustorp 1:6 in Halland",
+  "main": "index.html",
+  "scripts": {
+    "dev": "python3 -m http.server 8000",
+    "start": "python3 -m http.server 8000",
+    "vercel-dev": "vercel dev"
+  },
+  "keywords": ["conservation", "donation", "halland", "nature", "ustorp"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "stripe": "^14.0.0"
+  },
+  "devDependencies": {
+    "vercel": "^33.0.0"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Visne Ängar",
+        "area_hectares": 45,
+        "location": "Near Ljugarn, Gotland, Sweden",
+        "description": "Nature conservation area to be preserved through community donations"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [18.7123, 57.1445],
+            [18.7223, 57.1445],
+            [18.7223, 57.1378],
+            [18.7123, 57.1378],
+            [18.7123, 57.1445]
+          ]
+        ]
+      }
+    }
+  ]
+}
