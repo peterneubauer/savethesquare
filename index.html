@@ -8,42 +8,43 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <header>
-        <div class="container">
-            <h1>🌿 SAVE THE SQUARE</h1>
-            <p class="tagline">Rädda Ustorp 1:6 - En kvadratmeter i taget</p>
-        </div>
-    </header>
-
     <main>
         <section class="hero">
-            <div class="container">
+            <div class="hero-image-overlay"></div>
+            <div class="container hero-container">
                 <div class="hero-content">
-                    <h2>Hjälp oss bevara Ustorp 1:6</h2>
-                    <p>Ustorp 1:6 i Halland är ett unikt naturområde som behöver skyddas.
+                    <h1 class="hero-title">SAVE THE SQUARE</h1>
+                    <p class="hero-subtitle">Rädda Visne Ängar - En kvadratmeter i taget</p>
+                    <p class="hero-description">Visne Ängar på Gotland är ett unikt naturområde som behöver skyddas.
                     För endast <strong>20 SEK</strong> kan du "adoptera" en kvadratmeter och bidra till bevarandet.</p>
+                    <a href="#map-section" class="hero-cta">Välj din kvadratmeter</a>
+                </div>
+            </div>
+        </section>
 
-                    <div class="stats">
-                        <div class="stat">
-                            <span class="stat-number" id="donated-squares">0</span>
-                            <span class="stat-label">kvadratmeter räddade</span>
-                        </div>
-                        <div class="stat">
-                            <span class="stat-number" id="total-raised">0</span>
-                            <span class="stat-label">SEK insamlat</span>
-                        </div>
-                        <div class="stat">
-                            <span class="stat-number">450,000</span>
-                            <span class="stat-label">totala kvadratmeter</span>
-                        </div>
+        <section class="stats-section">
+            <div class="container">
+                <div class="stats">
+                    <div class="stat">
+                        <span class="stat-number" id="donated-squares">0</span>
+                        <span class="stat-label">kvadratmeter räddade</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-number" id="total-raised">0</span>
+                        <span class="stat-label">SEK insamlat</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-number">450,000</span>
+                        <span class="stat-label">totala kvadratmeter</span>
                     </div>
                 </div>
             </div>
         </section>
 
-        <section class="map-section">
+        <section class="map-section" id="map-section">
             <div class="container">
-                <h3>Interaktiv Karta - Klicka för att donera</h3>
+                <h2 class="section-title">Välj din kvadratmeter</h2>
+                <p class="section-subtitle">Klicka på kartan nedan för att välja och donera din kvadratmeter av Visne Ängar</p>
                 <p class="map-instructions">
                     <span class="legend-item"><span class="legend-box available"></span> Tillgänglig</span>
                     <span class="legend-item"><span class="legend-box donated"></span> Donerad</span>
@@ -69,11 +70,11 @@
 
         <section class="about">
             <div class="container">
-                <h3>Om Projektet</h3>
+                <h2 class="section-title">Om Projektet</h2>
                 <div class="about-content">
                     <div class="about-text">
-                        <p>Ustorp 1:6 är ett naturområde i Halland bestående av tre skifte (SKIFTE 1, 3 och 4).
-                        Området är hem för otaliga växt- och djurarter och utgör en viktig del av regionens biologiska mångfald.</p>
+                        <p>Visne Ängar är ett naturområde på östra Gotland.
+                        Området är hem för otaliga växt- och djurarter och utgör en viktig del av öns biologiska mångfald.</p>
 
                         <p>Genom att "adoptera" en eller flera kvadratmeter bidrar du direkt till skötsel och bevarande
                         av detta unika område. Varje donation går till markförvaltning, naturvård och långsiktigt skydd.</p>
@@ -96,7 +97,7 @@
 
     <footer>
         <div class="container">
-            <p>&copy; 2025 Save The Square | Projekt för bevarande av Ustorp 1:6</p>
+            <p>&copy; 2025 Save The Square | Projekt för bevarande av Visne Ängar, Gotland</p>
         </div>
     </footer>
 
@@ -119,6 +120,12 @@
                     <label for="donor-email">E-post (för kvitto):</label>
                     <input type="email" id="donor-email" name="donor-email" required
                            placeholder="din@email.se">
+                </div>
+
+                <div class="form-group">
+                    <label for="donor-greeting">Hälsning (valfritt, visas i bekräftelsemail):</label>
+                    <textarea id="donor-greeting" name="donor-greeting" rows="3" maxlength="250"
+                              placeholder="T.ex. 'Med hopp om en grönare framtid för kommande generationer.'"></textarea>
                 </div>
 
                 <button type="submit" class="btn-primary btn-large">

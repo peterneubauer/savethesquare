@@ -1,6 +1,30 @@
-node_modules/
+# Environment variables - NEVER commit these!
 .env
-.vercel
-.netlify
-*.log
+.env.local
+.env.production
+
+# Node modules
+node_modules/
+
+# Netlify
+.netlify/
+
+# Vercel (legacy)
+.vercel/
+
+# Data files
 donations.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*

@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(python3:*)",
-      "Bash(open http://localhost:8000)"
+      "Bash(open http://localhost:8000)",
+      "WebFetch(domain:www.capacity.eco)",
+      "Bash(open http://localhost:8001)"
     ],
     "deny": [],
     "ask": []

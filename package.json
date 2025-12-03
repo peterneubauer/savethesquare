@@ -4,17 +4,21 @@
   "description": "Save The Square - Donate to preserve Ustorp 1:6 in Halland",
   "main": "index.html",
   "scripts": {
-    "dev": "python3 -m http.server 8000",
+    "dev": "netlify dev",
     "start": "python3 -m http.server 8000",
-    "vercel-dev": "vercel dev"
+    "build": "echo 'No build step required for static site'",
+    "netlify-dev": "netlify dev"
   },
   "keywords": ["conservation", "donation", "halland", "nature", "ustorp"],
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "stripe": "^14.0.0"
+    "stripe": "^14.0.0",
+    "@sendgrid/mail": "^8.1.0",
+    "puppeteer-core": "^21.0.0",
+    "@sparticuz/chromium": "^119.0.0"
   },
   "devDependencies": {
-    "vercel": "^33.0.0"
+    "netlify-cli": "^17.0.0"
   }
 }

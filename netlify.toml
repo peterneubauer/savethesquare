@@ -1,0 +1,25 @@
+# Netlify configuration file
+[build]
+  # Directory with the static site files
+  publish = "."
+
+  # Netlify Functions directory
+  functions = "netlify/functions"
+
+# Redirect API calls to Netlify Functions
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+# Environment variables (set these in Netlify UI)
+# Don't put actual secrets in this file!
+[context.production]
+  # These are just placeholders to document required variables
+  # Set actual values in Netlify Dashboard: Site Settings → Environment Variables
+
+[context.deploy-preview]
+  # Preview deployments can use test mode
+
+[context.branch-deploy]
+  # Branch deploys can use test mode
