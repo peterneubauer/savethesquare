@@ -10,6 +10,7 @@ const CONFIG = {
     apiUrl: window.location.origin,
 
     // Enable test mode (shows alerts instead of real payments)
-    // Set to false when ready for production
-    testMode: true
+    // Controlled by STRIPE_TEST_MODE environment variable (defaults to false for production)
+    // Set STRIPE_TEST_MODE=true in Netlify to enable test mode
+    testMode: __STRIPE_TEST_MODE__
 };

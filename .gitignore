@@ -3,6 +3,9 @@
 .env.local
 .env.production
 
+# Generated config file (built from config.template.js)
+config.js
+
 # Node modules
 node_modules/
 
