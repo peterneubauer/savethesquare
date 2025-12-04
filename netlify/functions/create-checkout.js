@@ -1,32 +1,49 @@
-// Serverless function to create Stripe Checkout session
-// Compatible with Vercel/Netlify
+// Netlify Function to create Stripe Checkout session
 
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
-module.exports = async (req, res) => {
+exports.handler = async (event, context) => {
     // Enable CORS
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    const headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS'
+    };
 
     // Handle preflight
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
+    if (event.httpMethod === 'OPTIONS') {
+        return {
+            statusCode: 200,
+            headers,
+            body: ''
+        };
     }
 
-    if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
+    if (event.httpMethod !== 'POST') {
+        return {
+            statusCode: 405,
+            headers,
+            body: JSON.stringify({ error: 'Method not allowed' })
+        };
     }
 
     try {
-        const { squares, donorName, donorEmail } = req.body;
+        const { squares, donorName, donorEmail, donorGreeting } = JSON.parse(event.body);
 
         if (!squares || !Array.isArray(squares) || squares.length === 0) {
-            return res.status(400).json({ error: 'Invalid squares data' });
+            return {
+                statusCode: 400,
+                headers,
+                body: JSON.stringify({ error: 'Invalid squares data' })
+            };
         }
 
         if (!donorName || !donorEmail) {
-            return res.status(400).json({ error: 'Donor name and email required' });
+            return {
+                statusCode: 400,
+                headers,
+                body: JSON.stringify({ error: 'Donor name and email required' })
+            };
         }
 
         const squareCount = squares.length;
@@ -40,9 +57,8 @@ module.exports = async (req, res) => {
                     price_data: {
                         currency: 'sek',
                         product_data: {
-                            name: 'Save The Square - Ustorp 1:6',
+                            name: 'Save The Square - Visne Ängar',
                             description: `Donation för ${squareCount} kvadratmeter`,
-                            images: ['https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Nature_landscape.jpg/640px-Nature_landscape.jpg'],
                         },
                         unit_amount: 2000, // 20.00 SEK in öre
                     },
@@ -50,19 +66,28 @@ module.exports = async (req, res) => {
                 },
             ],
             mode: 'payment',
-            success_url: `${req.headers.origin || 'http://localhost:8000'}/?success=true`,
-            cancel_url: `${req.headers.origin || 'http://localhost:8000'}/?canceled=true`,
+            success_url: `${event.headers.origin || event.headers.referer || 'http://localhost:8888'}?success=true`,
+            cancel_url: `${event.headers.origin || event.headers.referer || 'http://localhost:8888'}?canceled=true`,
             customer_email: donorEmail,
             metadata: {
                 donorName: donorName,
+                donorGreeting: donorGreeting || '',
                 squareCount: squareCount.toString(),
                 squares: JSON.stringify(squares),
             },
         });
 
-        res.status(200).json({ sessionId: session.id, url: session.url });
+        return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify({ sessionId: session.id, url: session.url })
+        };
     } catch (error) {
         console.error('Stripe error:', error);
-        res.status(500).json({ error: error.message });
+        return {
+            statusCode: 500,
+            headers,
+            body: JSON.stringify({ error: error.message })
+        };
     }
 };

@@ -1,4 +1,4 @@
-// Serverless function to send confirmation email with PDF
+// Netlify Function to send confirmation email with PDF
 // Uses SendGrid for email and Puppeteer for PDF generation
 
 const sgMail = require('@sendgrid/mail');
@@ -10,25 +10,38 @@ if (process.env.SENDGRID_API_KEY) {
     sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 }
 
-module.exports = async (req, res) => {
-    // Enable CORS
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+exports.handler = async (event, context) => {
+    const headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS'
+    };
 
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
+    if (event.httpMethod === 'OPTIONS') {
+        return {
+            statusCode: 200,
+            headers,
+            body: ''
+        };
     }
 
-    if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
+    if (event.httpMethod !== 'POST') {
+        return {
+            statusCode: 405,
+            headers,
+            body: JSON.stringify({ error: 'Method not allowed' })
+        };
     }
 
     try {
-        const { donorName, donorEmail, donorGreeting, squares, amount, testMode } = req.body;
+        const { donorName, donorEmail, donorGreeting, squares, amount, testMode } = JSON.parse(event.body);
 
         if (!donorEmail || !squares || !Array.isArray(squares)) {
-            return res.status(400).json({ error: 'Missing required fields' });
+            return {
+                statusCode: 400,
+                headers,
+                body: JSON.stringify({ error: 'Missing required fields' })
+            };
         }
 
         // Create highlight URL
@@ -40,29 +53,32 @@ module.exports = async (req, res) => {
 
         // Test mode: Return preview with basic PDF simulation
         if (testMode) {
-            // In test mode, generate a simple PDF preview URL (just the highlight page)
-            // Instead of using Puppeteer, we'll just provide the URL for preview
             const pdfPreviewUrl = highlightUrl;
 
-            return res.status(200).json({
-                success: true,
-                testMode: true,
-                message: 'Test mode - email preview generated (not sent)',
-                preview: {
-                    to: donorEmail,
-                    from: process.env.FROM_EMAIL || 'noreply@savethesquare.se',
-                    subject: 'Tack för din donation till Visne Ängar! 🌿',
-                    text: emailText,
-                    html: emailHTML,
-                    highlightUrl: highlightUrl,
-                    pdfPreviewUrl: pdfPreviewUrl,
-                    pdfInfo: 'PDF generation skipped in test mode - preview shows the page that would be captured'
-                }
-            });
+            return {
+                statusCode: 200,
+                headers,
+                body: JSON.stringify({
+                    success: true,
+                    testMode: true,
+                    message: 'Test mode - email preview generated (not sent)',
+                    preview: {
+                        to: donorEmail,
+                        from: process.env.FROM_EMAIL || 'noreply@savethesquare.se',
+                        subject: 'Tack för din donation till Visne Ängar! 🌿',
+                        text: emailText,
+                        html: emailHTML,
+                        highlightUrl: highlightUrl,
+                        pdfPreviewUrl: pdfPreviewUrl,
+                        pdfInfo: 'PDF generation skipped in test mode - preview shows the page that would be captured'
+                    }
+                })
+            };
         }
 
         // Production mode: Generate PDF and send email
-        const pdfBuffer = await generateMapPDF(highlightUrl, donorName, squares.length);
+        // Skip PDF generation in local development
+        const isLocal = !process.env.AWS_LAMBDA_FUNCTION_NAME;
 
         const msg = {
             to: donorEmail,
@@ -70,32 +86,50 @@ module.exports = async (req, res) => {
             subject: 'Tack för din donation till Visne Ängar! 🌿',
             text: emailText,
             html: emailHTML,
-            attachments: [
+        };
+
+        // Only generate and attach PDF in production (on Netlify)
+        if (!isLocal) {
+            const pdfBuffer = await generateMapPDF(highlightUrl, donorName, squares.length);
+            msg.attachments = [
                 {
                     content: pdfBuffer.toString('base64'),
                     filename: `visne-angar-donation-${donorName.replace(/\s+/g, '-')}.pdf`,
                     type: 'application/pdf',
                     disposition: 'attachment'
                 }
-            ]
-        };
+            ];
+        } else {
+            console.log('⚠️  Skipping PDF generation in local development');
+        }
 
         await sgMail.send(msg);
 
-        res.status(200).json({ success: true, message: 'Email sent successfully' });
+        return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify({ success: true, message: 'Email sent successfully' })
+        };
     } catch (error) {
         console.error('Email error:', error);
-        res.status(500).json({ error: error.message });
+        return {
+            statusCode: 500,
+            headers,
+            body: JSON.stringify({ error: error.message })
+        };
     }
 };
 
 // Generate PDF with map screenshot
 async function generateMapPDF(highlightUrl, donorName, squareCount) {
+    // Detect if running locally or on Netlify
+    const isLocal = !process.env.AWS_LAMBDA_FUNCTION_NAME;
+
     const browser = await puppeteer.launch({
-        args: chromium.args,
-        defaultViewport: chromium.defaultViewport,
-        executablePath: await chromium.executablePath(),
-        headless: chromium.headless,
+        args: isLocal ? ['--no-sandbox', '--disable-setuid-sandbox'] : chromium.args,
+        defaultViewport: isLocal ? { width: 1920, height: 1080 } : chromium.defaultViewport,
+        executablePath: isLocal ? undefined : await chromium.executablePath(), // Use system Chrome locally
+        headless: isLocal ? true : chromium.headless,
     });
 
     const page = await browser.newPage();

@@ -12,5 +12,10 @@ const CONFIG = {
     // Enable test mode (shows alerts instead of real payments)
     // Controlled by STRIPE_TEST_MODE environment variable (defaults to false for production)
     // Set STRIPE_TEST_MODE=true in Netlify to enable test mode
-    testMode: __STRIPE_TEST_MODE__
+    testMode: __STRIPE_TEST_MODE__,
+
+    // Enable email test mode (shows email preview instead of sending)
+    // Controlled by EMAIL_TEST_MODE environment variable (defaults to same as testMode)
+    // Set EMAIL_TEST_MODE=false to send real emails even when Stripe is in test mode
+    emailTestMode: __EMAIL_TEST_MODE__
 };
