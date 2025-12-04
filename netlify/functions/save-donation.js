@@ -24,7 +24,7 @@ exports.handler = async (event, context) => {
     }
 
     try {
-        const { donorName, donorEmail, donorGreeting, squares, amount } = JSON.parse(event.body);
+        const { donorName, donorEmail, donorGreeting, squares, amount, modeData } = JSON.parse(event.body);
 
         if (!donorName || !donorEmail || !squares || !amount) {
             return {
@@ -41,6 +41,7 @@ exports.handler = async (event, context) => {
             donorGreeting,
             squares,
             amount,
+            modeData: modeData || { mode: 'click' },
             timestamp: new Date().toISOString(),
             sessionId: `test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, // Generate fake session ID for test mode
             paymentStatus: 'test_mode_simulated'

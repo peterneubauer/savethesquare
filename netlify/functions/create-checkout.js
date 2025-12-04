@@ -28,7 +28,7 @@ exports.handler = async (event, context) => {
     }
 
     try {
-        const { squares, donorName, donorEmail, donorGreeting } = JSON.parse(event.body);
+        const { squares, donorName, donorEmail, donorGreeting, modeData } = JSON.parse(event.body);
 
         if (!squares || !Array.isArray(squares) || squares.length === 0) {
             return {
@@ -49,6 +49,12 @@ exports.handler = async (event, context) => {
         const squareCount = squares.length;
         const amount = squareCount * 20; // 20 SEK per square
 
+        // Prepare product description based on mode
+        let productDescription = `Donation för ${squareCount} kvadratmeter`;
+        if (modeData && modeData.mode === 'text') {
+            productDescription = `Text-donation: "${modeData.text}" (${squareCount} kvadratmeter)`;
+        }
+
         // Create Stripe Checkout Session
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ['card'],
@@ -58,7 +64,7 @@ exports.handler = async (event, context) => {
                         currency: 'sek',
                         product_data: {
                             name: 'Save The Square - Visne Ängar',
-                            description: `Donation för ${squareCount} kvadratmeter`,
+                            description: productDescription,
                         },
                         unit_amount: 2000, // 20.00 SEK in öre
                     },
@@ -74,6 +80,7 @@ exports.handler = async (event, context) => {
                 donorGreeting: donorGreeting || '',
                 squareCount: squareCount.toString(),
                 squares: JSON.stringify(squares),
+                modeData: modeData ? JSON.stringify(modeData) : JSON.stringify({ mode: 'click' }),
             },
         });
 

@@ -30,6 +30,7 @@ function getSupabaseClient() {
  * - donor_greeting: text (optional)
  * - squares: jsonb (array of square keys)
  * - amount: numeric
+ * - mode_data: jsonb (contains mode, and for text mode: text, color, fontSize, pixelDensity, pixelRadius, zoom)
  * - timestamp: timestamptz
  * - session_id: text
  * - payment_status: text
@@ -50,6 +51,7 @@ async function saveDonation(donationData) {
             donor_greeting: donationData.donorGreeting || null,
             squares: donationData.squares,
             amount: donationData.amount,
+            mode_data: donationData.modeData || { mode: 'click' },
             timestamp: donationData.timestamp,
             session_id: donationData.sessionId,
             payment_status: donationData.paymentStatus
@@ -98,12 +100,15 @@ function transformToSquareData(donations) {
     const squareData = {};
 
     donations.forEach(donation => {
+        const modeData = donation.mode_data || { mode: 'click' };
+
         donation.squares.forEach(squareKey => {
             squareData[squareKey] = {
                 donor: donation.donor_name,
                 email: donation.donor_email,
                 greeting: donation.donor_greeting,
                 timestamp: donation.timestamp,
+                ...modeData  // Include mode, text, color, fontSize, zoom if text mode
             };
         });
     });

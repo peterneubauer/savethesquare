@@ -49,7 +49,7 @@
                         <span class="stat-label">SEK insamlat</span>
                     </div>
                     <div class="stat">
-                        <span class="stat-number">450,000</span>
+                        <span class="stat-number">300,000</span>
                         <span class="stat-label">totala kvadratmeter</span>
                     </div>
                 </div>
@@ -60,6 +60,19 @@
             <div class="container">
                 <h2 class="section-title">Välj din kvadratmeter</h2>
                 <p class="section-subtitle">Klicka på kartan nedan för att välja och donera din kvadratmeter av Visne Ängar</p>
+
+                <!-- Mode Toggle -->
+                <div class="mode-toggle-container">
+                    <button id="click-mode-btn" class="mode-btn active">
+                        <span class="mode-icon">👆</span>
+                        <span class="mode-label">Klick-läge</span>
+                    </button>
+                    <button id="text-mode-btn" class="mode-btn">
+                        <span class="mode-icon">✍️</span>
+                        <span class="mode-label">Text-läge</span>
+                    </button>
+                </div>
+
                 <p class="map-instructions">
                     <span class="legend-item"><span class="legend-box available"></span> Tillgänglig</span>
                     <span class="legend-item"><span class="legend-box donated"></span> Donerad</span>
@@ -69,6 +82,36 @@
                         Använd zoom-kontrollerna (+/-) för att zooma. Håll Shift och dra för att panorera.
                     </small>
                 </p>
+
+                <!-- Text Mode Controls (above map) -->
+                <div id="text-overlay" class="text-overlay hidden">
+                    <div class="text-controls">
+                        <div class="text-control-main">
+                            <textarea id="text-input" placeholder="Skriv din text här..." rows="1"></textarea>
+                        </div>
+                        <div class="text-control-grid">
+                            <div class="text-control-item">
+                                <label for="text-color">Färg</label>
+                                <input type="color" id="text-color" value="#FFD700">
+                            </div>
+                            <div class="text-control-item">
+                                <label for="font-size">Storlek: <span id="font-size-display">40</span></label>
+                                <input type="range" id="font-size" min="20" max="100" value="40" step="5">
+                            </div>
+                            <div class="text-control-item">
+                                <label for="pixel-density">Densitet: <span id="pixel-density-display">3</span></label>
+                                <input type="range" id="pixel-density" min="1" max="10" value="3" step="1">
+                            </div>
+                            <div class="text-control-item">
+                                <label for="pixel-radius">Radie: <span id="pixel-radius-display">8</span></label>
+                                <input type="range" id="pixel-radius" min="3" max="20" value="8" step="1">
+                            </div>
+                        </div>
+                        <div class="text-stats">
+                            <div id="text-conflicts" class="hidden conflict-warning"></div>
+                        </div>
+                    </div>
+                </div>
 
                 <div id="map-container">
                     <div id="donation-map-leaflet"></div>

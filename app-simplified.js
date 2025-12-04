@@ -10,8 +10,50 @@ let propertyData = null;
 let canvasOverlay = null;
 let highlightedSquares = []; // Store highlighted square keys for re-rendering
 
+// Text mode variables
+let currentMode = 'click'; // 'click' or 'text'
+let textModeData = {
+    text: '',
+    color: '#FFD700',
+    fontSize: 40,
+    pixelDensity: 3,
+    pixelRadius: 8,
+    zoom: 17,
+    squares: new Set(),
+    conflictSquares: new Set()
+};
+let textPreviewLayers = []; // Store text preview polygon layers
+
+// Load saved settings from localStorage
+function loadTextSettings() {
+    const saved = localStorage.getItem('textModeSettings');
+    if (saved) {
+        try {
+            const settings = JSON.parse(saved);
+            if (settings.color) textModeData.color = settings.color;
+            if (settings.fontSize) textModeData.fontSize = settings.fontSize;
+            if (settings.pixelDensity) textModeData.pixelDensity = settings.pixelDensity;
+            if (settings.pixelRadius) textModeData.pixelRadius = settings.pixelRadius;
+        } catch (e) {
+            console.error('Error loading text settings:', e);
+        }
+    }
+}
+
+// Save settings to localStorage
+function saveTextSettings() {
+    const settings = {
+        color: textModeData.color,
+        fontSize: textModeData.fontSize,
+        pixelDensity: textModeData.pixelDensity,
+        pixelRadius: textModeData.pixelRadius
+    };
+    localStorage.setItem('textModeSettings', JSON.stringify(settings));
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
+    loadTextSettings(); // Load saved settings
     loadPropertyData();
     checkPaymentStatus();
     // checkHighlightParameter will be called after map is initialized
@@ -128,6 +170,19 @@ function initDonationMap() {
 
     // Add click handler for donations
     donationMap.on('click', handleMapClick);
+
+    // Add zoom/pan handlers for text mode preview updates
+    donationMap.on('zoomend', () => {
+        if (currentMode === 'text' && textModeData.text.trim()) {
+            updateTextPreview();
+        }
+    });
+
+    donationMap.on('moveend', () => {
+        if (currentMode === 'text' && textModeData.text.trim()) {
+            updateTextPreview();
+        }
+    });
 }
 
 function addCustomZoomControls() {
@@ -243,40 +298,72 @@ function renderDonations() {
         return;
     }
 
-    // Clear existing markers EXCEPT highlighted ones and property boundaries
+    // Clear existing markers EXCEPT highlighted ones, text previews, and property boundaries
     donationMap.eachLayer(layer => {
         if ((layer instanceof L.CircleMarker || layer instanceof L.Polygon) &&
             !layer.options.className?.includes('highlighted') &&
+            !layer.options.className?.includes('text-preview') &&
+            !layer.options.className?.includes('text-conflict') &&
             !layer.options.className?.includes('property-boundary') &&
             !layer.options.className?.includes('inverse-mask')) {
             donationMap.removeLayer(layer);
         }
     });
 
+    // Calculate meter-to-degree conversion at current latitude
+    const centerLat = donationMap.getCenter().lat;
+    const meterInDegLat = 0.000009;
+    const meterInDegLng = 0.000009 / Math.cos(centerLat * Math.PI / 180);
+
     // Draw donated squares
     for (const [key, data] of Object.entries(squareData)) {
         const [lat, lng] = key.split('_').map(n => n / 100000);
-        L.circleMarker([lat, lng], {
-            radius: 6,
-            fillColor: '#27ae60',
-            fillOpacity: 0.95,
-            stroke: true,
-            color: '#1e8449',
-            weight: 2,
-            opacity: 1
-        }).addTo(donationMap).bindPopup(`Donerad av: ${data.donor}`);
+
+        // Check if this is a text-mode donation
+        if (data.mode === 'text') {
+            // Render as colored square polygon
+            const squareBounds = [
+                [lat - meterInDegLat/2, lng - meterInDegLng/2],
+                [lat - meterInDegLat/2, lng + meterInDegLng/2],
+                [lat + meterInDegLat/2, lng + meterInDegLng/2],
+                [lat + meterInDegLat/2, lng - meterInDegLng/2],
+                [lat - meterInDegLat/2, lng - meterInDegLng/2]
+            ];
+
+            L.polygon(squareBounds, {
+                color: data.color || '#FFD700',
+                weight: 1,
+                fillColor: data.color || '#FFD700',
+                fillOpacity: 0.8,
+                className: 'donated-text-square'
+            }).addTo(donationMap).bindPopup(`Donerad av: ${data.donor}<br><small>Text: "${data.text}"</small>`);
+        } else {
+            // Render as green circle marker (click mode)
+            L.circleMarker([lat, lng], {
+                radius: 6,
+                fillColor: '#27ae60',
+                fillOpacity: 0.95,
+                stroke: true,
+                color: '#1e8449',
+                weight: 2,
+                opacity: 1,
+                className: 'donated-click-square'
+            }).addTo(donationMap).bindPopup(`Donerad av: ${data.donor}`);
+        }
     }
 
-    // Draw selected squares
-    selectedSquares.forEach(key => {
-        const [lat, lng] = key.split('_').map(n => n / 100000);
-        L.circleMarker([lat, lng], {
-            radius: 3,
-            fillColor: '#ffd54f',
-            fillOpacity: 0.8,
-            stroke: false
-        }).addTo(donationMap);
-    });
+    // Draw selected squares (click mode only)
+    if (currentMode === 'click') {
+        selectedSquares.forEach(key => {
+            const [lat, lng] = key.split('_').map(n => n / 100000);
+            L.circleMarker([lat, lng], {
+                radius: 3,
+                fillColor: '#ffd54f',
+                fillOpacity: 0.8,
+                stroke: false
+            }).addTo(donationMap);
+        });
+    }
 
     // Re-render highlighted squares if they exist (to keep them on top)
     rehighlightSquares();
@@ -314,11 +401,43 @@ function setupEventListeners() {
     document.getElementById('donation-modal').addEventListener('click', (e) => {
         if (e.target.id === 'donation-modal') closeDonationModal();
     });
+
+    // Mode toggle buttons
+    document.getElementById('click-mode-btn').addEventListener('click', () => switchMode('click'));
+    document.getElementById('text-mode-btn').addEventListener('click', () => switchMode('text'));
+
+    // Text mode controls
+    document.getElementById('text-input').addEventListener('input', handleTextInput);
+    document.getElementById('text-color').addEventListener('input', handleColorChange);
+    document.getElementById('font-size').addEventListener('input', handleFontSizeChange);
+    document.getElementById('pixel-density').addEventListener('input', handlePixelDensityChange);
+    document.getElementById('pixel-radius').addEventListener('input', handlePixelRadiusChange);
+
+    // Update displays
+    document.getElementById('font-size').addEventListener('input', (e) => {
+        document.getElementById('font-size-display').textContent = e.target.value + 'px';
+    });
+    document.getElementById('pixel-density').addEventListener('input', (e) => {
+        document.getElementById('pixel-density-display').textContent = e.target.value;
+    });
+    document.getElementById('pixel-radius').addEventListener('input', (e) => {
+        document.getElementById('pixel-radius-display').textContent = e.target.value;
+    });
+
+    // Load saved settings into UI
+    document.getElementById('text-color').value = textModeData.color;
+    document.getElementById('font-size').value = textModeData.fontSize;
+    document.getElementById('font-size-display').textContent = textModeData.fontSize + 'px';
+    document.getElementById('pixel-density').value = textModeData.pixelDensity;
+    document.getElementById('pixel-density-display').textContent = textModeData.pixelDensity;
+    document.getElementById('pixel-radius').value = textModeData.pixelRadius;
+    document.getElementById('pixel-radius-display').textContent = textModeData.pixelRadius;
 }
 
 function updateSelectionUI() {
-    const count = selectedSquares.size;
+    const count = currentMode === 'text' ? textModeData.squares.size : selectedSquares.size;
     const total = count * SQUARE_PRICE;
+
     document.getElementById('selected-count').textContent = count;
     document.getElementById('total-amount').textContent = total;
     document.getElementById('donate-btn').disabled = count === 0;
@@ -326,14 +445,24 @@ function updateSelectionUI() {
 }
 
 function clearSelection() {
-    selectedSquares.clear();
+    if (currentMode === 'text') {
+        textModeData.squares.clear();
+        textModeData.conflictSquares.clear();
+        clearTextPreview();
+        updateTextStats();
+        // Clear the text input
+        document.getElementById('text-input').value = '';
+        textModeData.text = '';
+    } else {
+        selectedSquares.clear();
+    }
     updateSelectionUI();
     renderDonations();
 }
 
 function openDonationModal() {
-    if (selectedSquares.size === 0) return;
-    const count = selectedSquares.size;
+    const count = currentMode === 'text' ? textModeData.squares.size : selectedSquares.size;
+    if (count === 0) return;
     const total = count * SQUARE_PRICE;
     document.getElementById('modal-square-count').textContent = count;
     document.getElementById('modal-total').textContent = total;
@@ -350,14 +479,35 @@ async function handleDonationSubmit(e) {
     const donorName = document.getElementById('donor-name').value;
     const donorEmail = document.getElementById('donor-email').value;
     const donorGreeting = document.getElementById('donor-greeting').value;
-    const squares = Array.from(selectedSquares);
-    const amount = squares.length * SQUARE_PRICE;
+
+    // Get squares based on current mode
+    let squares, amount;
+    let modeData = { mode: currentMode };
+
+    if (currentMode === 'text') {
+        squares = Array.from(textModeData.squares);
+        amount = squares.length * SQUARE_PRICE;
+        modeData = {
+            mode: 'text',
+            text: textModeData.text,
+            color: textModeData.color,
+            fontSize: textModeData.fontSize,
+            pixelDensity: textModeData.pixelDensity,
+            pixelRadius: textModeData.pixelRadius,
+            zoom: textModeData.zoom
+        };
+    } else {
+        squares = Array.from(selectedSquares);
+        amount = squares.length * SQUARE_PRICE;
+        modeData = { mode: 'click' };
+    }
 
     if (CONFIG.testMode) {
-        alert(`TEST MODE\n\nBetalning: ${amount} SEK\nDonor: ${donorName}\nE-post: ${donorEmail}\nKvadrater: ${squares.length}\nHälsning: ${donorGreeting || '(ingen)'}\n\nI produktion skulle detta öppna Stripe Checkout och skicka bekräftelsemail med PDF.`);
+        const modeInfo = currentMode === 'text' ? `\nLäge: Text-läge\nText: "${modeData.text}"\nFärg: ${modeData.color}` : '\nLäge: Klick-läge';
+        alert(`TEST MODE\n\nBetalning: ${amount} SEK\nDonor: ${donorName}\nE-post: ${donorEmail}\nKvadrater: ${squares.length}\nHälsning: ${donorGreeting || '(ingen)'}${modeInfo}\n\nI produktion skulle detta öppna Stripe Checkout och skicka bekräftelsemail med PDF.`);
         const confirmed = confirm('Simulera lyckad betalning och email?');
         if (confirmed) {
-            completeDonation(squares, donorName, donorEmail, donorGreeting);
+            completeDonation(squares, donorName, donorEmail, donorGreeting, modeData);
         }
     } else {
         // Production mode - use real Stripe Checkout
@@ -367,7 +517,8 @@ async function handleDonationSubmit(e) {
                 squares,
                 donorName,
                 donorEmail,
-                donorGreeting
+                donorGreeting,
+                modeData
             }));
 
             // Create Stripe Checkout Session
@@ -380,7 +531,8 @@ async function handleDonationSubmit(e) {
                     squares,
                     donorName,
                     donorEmail,
-                    donorGreeting
+                    donorGreeting,
+                    modeData
                 })
             });
 
@@ -399,7 +551,7 @@ async function handleDonationSubmit(e) {
     }
 }
 
-async function completeDonation(squares, donorName, donorEmail, donorGreeting = '') {
+async function completeDonation(squares, donorName, donorEmail, donorGreeting = '', modeData = { mode: 'click' }) {
     const timestamp = new Date().toISOString();
     const amount = squares.length * SQUARE_PRICE;
 
@@ -415,7 +567,8 @@ async function completeDonation(squares, donorName, donorEmail, donorGreeting = 
                 donorEmail,
                 donorGreeting,
                 squares,
-                amount
+                amount,
+                modeData
             })
         });
 
@@ -434,11 +587,15 @@ async function completeDonation(squares, donorName, donorEmail, donorGreeting = 
             donor: donorName,
             email: donorEmail,
             greeting: donorGreeting,
-            timestamp
+            timestamp,
+            ...modeData  // Include mode, text, color, fontSize, zoom if text mode
         };
     });
     saveSquareData();
     selectedSquares.clear();
+    textModeData.squares.clear();
+    textModeData.conflictSquares.clear();
+    clearTextPreview();
     updateSelectionUI();
     renderDonations();
     updateStats();
@@ -759,8 +916,8 @@ function checkPaymentStatus() {
     if (urlParams.get('success') === 'true') {
         const pending = localStorage.getItem('pendingDonation');
         if (pending) {
-            const { squares, donorName, donorEmail, donorGreeting } = JSON.parse(pending);
-            completeDonation(squares, donorName, donorEmail, donorGreeting);
+            const { squares, donorName, donorEmail, donorGreeting, modeData } = JSON.parse(pending);
+            completeDonation(squares, donorName, donorEmail, donorGreeting, modeData || { mode: 'click' });
             localStorage.removeItem('pendingDonation');
         } else {
             alert('Betalning genomförd! Tack för ditt stöd! ✅');
@@ -773,6 +930,272 @@ function checkPaymentStatus() {
     }
 }
 
+// ============ TEXT MODE FUNCTIONS ============
+
+function switchMode(mode) {
+    currentMode = mode;
+
+    // Update button states
+    document.getElementById('click-mode-btn').classList.toggle('active', mode === 'click');
+    document.getElementById('text-mode-btn').classList.toggle('active', mode === 'text');
+
+    // Show/hide text overlay
+    document.getElementById('text-overlay').classList.toggle('hidden', mode === 'click');
+
+    // Clear selections when switching modes
+    if (mode === 'click') {
+        clearTextPreview();
+        textModeData.squares.clear();
+        textModeData.conflictSquares.clear();
+    } else {
+        selectedSquares.clear();
+    }
+
+    updateSelectionUI();
+    renderDonations();
+}
+
+function handleTextInput(e) {
+    textModeData.text = e.target.value;
+    updateTextPreview();
+}
+
+function handleColorChange(e) {
+    textModeData.color = e.target.value;
+    saveTextSettings();
+    updateTextPreview();
+}
+
+function handleFontSizeChange(e) {
+    textModeData.fontSize = parseInt(e.target.value);
+    saveTextSettings();
+    updateTextPreview();
+}
+
+function handlePixelDensityChange(e) {
+    textModeData.pixelDensity = parseInt(e.target.value);
+    saveTextSettings();
+    updateTextPreview();
+}
+
+function handlePixelRadiusChange(e) {
+    textModeData.pixelRadius = parseInt(e.target.value);
+    saveTextSettings();
+    updateTextPreview();
+}
+
+function updateTextPreview() {
+    if (!textModeData.text.trim()) {
+        clearTextPreview();
+        textModeData.squares.clear();
+        textModeData.conflictSquares.clear();
+        updateTextStats();
+        return;
+    }
+
+    // Get current zoom level
+    textModeData.zoom = donationMap.getZoom();
+
+    // Convert text to squares
+    const squares = textToSquares(textModeData.text, textModeData.fontSize, textModeData.color);
+
+    // Check for conflicts with donated squares
+    textModeData.squares.clear();
+    textModeData.conflictSquares.clear();
+
+    squares.forEach(squareKey => {
+        if (squareData[squareKey]) {
+            textModeData.conflictSquares.add(squareKey);
+        } else {
+            textModeData.squares.add(squareKey);
+        }
+    });
+
+    // Render preview
+    renderTextPreview();
+    updateTextStats();
+}
+
+function textToSquares(text, fontSize, color) {
+    if (!donationMap) return [];
+
+    // Create offscreen canvas
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    // Set canvas size (make it large enough for text)
+    canvas.width = 2000;
+    canvas.height = 500;
+
+    // Set font and style
+    ctx.font = `bold ${fontSize}px Arial`;
+    ctx.fillStyle = 'black';
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'center';
+
+    // Draw text on canvas
+    ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+
+    // Get image data
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const pixels = imageData.data;
+
+    // Get map center (where text is positioned)
+    const mapCenter = donationMap.getCenter();
+    const mapBounds = donationMap.getBounds();
+    const mapPixelBounds = donationMap.getSize();
+
+    // Calculate pixels per degree at current zoom
+    const latRange = mapBounds.getNorth() - mapBounds.getSouth();
+    const lngRange = mapBounds.getEast() - mapBounds.getWest();
+    const pixelsPerDegreeLat = mapPixelBounds.y / latRange;
+    const pixelsPerDegreeLng = mapPixelBounds.x / lngRange;
+
+    // Sample pixels to find text - use pixelDensity to control sampling
+    // Higher density = more samples = more detailed text = more squares
+    const sampleRate = Math.max(1, Math.floor(fontSize / (textModeData.pixelDensity * 3)));
+    const squares = new Set();
+
+    for (let y = 0; y < canvas.height; y += sampleRate) {
+        for (let x = 0; x < canvas.width; x += sampleRate) {
+            const index = (y * canvas.width + x) * 4;
+            const alpha = pixels[index + 3];
+
+            // If pixel is not transparent (text is present)
+            if (alpha > 128) {
+                // Convert canvas coordinates to map offset from center
+                const offsetX = x - canvas.width / 2;
+                const offsetY = canvas.height / 2 - y; // Invert Y axis
+
+                // Convert pixel offset to lat/lng offset
+                const latOffset = offsetY / pixelsPerDegreeLat;
+                const lngOffset = offsetX / pixelsPerDegreeLng;
+
+                // Calculate actual lat/lng
+                const lat = mapCenter.lat + latOffset;
+                const lng = mapCenter.lng + lngOffset;
+
+                // Check if within property bounds
+                if (isPointInProperty(lng, lat)) {
+                    const key = `${Math.floor(lat * 100000)}_${Math.floor(lng * 100000)}`;
+                    squares.add(key);
+                }
+            }
+        }
+    }
+
+    return Array.from(squares);
+}
+
+function renderTextPreview() {
+    // Clear existing preview
+    clearTextPreview();
+
+    if (textModeData.squares.size === 0 && textModeData.conflictSquares.size === 0) {
+        return;
+    }
+
+    // Calculate meter-to-degree conversion at current latitude
+    const centerLat = donationMap.getCenter().lat;
+    const meterInDegLat = 0.000009;
+    const meterInDegLng = 0.000009 / Math.cos(centerLat * Math.PI / 180);
+
+    // Render available squares in selected color (same style as highlight view)
+    textModeData.squares.forEach(key => {
+        const [lat, lng] = key.split('_').map(n => n / 100000);
+
+        const squareBounds = [
+            [lat - meterInDegLat/2, lng - meterInDegLng/2],  // Southwest
+            [lat - meterInDegLat/2, lng + meterInDegLng/2],  // Southeast
+            [lat + meterInDegLat/2, lng + meterInDegLng/2],  // Northeast
+            [lat + meterInDegLat/2, lng - meterInDegLng/2],  // Northwest
+            [lat - meterInDegLat/2, lng - meterInDegLng/2]   // Close
+        ];
+
+        // Draw square polygon outline
+        const polygon = L.polygon(squareBounds, {
+            color: textModeData.color,
+            weight: 2,
+            fillColor: textModeData.color,
+            fillOpacity: 0.4,
+            className: 'text-preview-square-polygon'
+        }).addTo(donationMap);
+
+        // Draw circular marker at center (like highlight view)
+        const marker = L.circleMarker([lat, lng], {
+            radius: textModeData.pixelRadius,
+            fillColor: textModeData.color,
+            fillOpacity: 0.8,
+            color: textModeData.color,
+            weight: 2,
+            className: 'text-preview-square-marker'
+        }).addTo(donationMap);
+
+        textPreviewLayers.push(polygon, marker);
+    });
+
+    // Render conflict squares in red (same style as highlight view)
+    textModeData.conflictSquares.forEach(key => {
+        const [lat, lng] = key.split('_').map(n => n / 100000);
+
+        const squareBounds = [
+            [lat - meterInDegLat/2, lng - meterInDegLng/2],
+            [lat - meterInDegLat/2, lng + meterInDegLng/2],
+            [lat + meterInDegLat/2, lng + meterInDegLng/2],
+            [lat + meterInDegLat/2, lng - meterInDegLng/2],
+            [lat - meterInDegLat/2, lng - meterInDegLng/2]
+        ];
+
+        // Draw square polygon outline
+        const polygon = L.polygon(squareBounds, {
+            color: '#dc3545',
+            weight: 2,
+            fillColor: '#dc3545',
+            fillOpacity: 0.3,
+            className: 'text-conflict-square-polygon'
+        }).addTo(donationMap);
+
+        // Draw circular marker at center
+        const marker = L.circleMarker([lat, lng], {
+            radius: textModeData.pixelRadius,
+            fillColor: '#dc3545',
+            fillOpacity: 0.8,
+            color: '#dc3545',
+            weight: 2,
+            className: 'text-conflict-square-marker'
+        }).addTo(donationMap);
+
+        textPreviewLayers.push(polygon, marker);
+    });
+}
+
+function clearTextPreview() {
+    textPreviewLayers.forEach(layer => {
+        donationMap.removeLayer(layer);
+    });
+    textPreviewLayers = [];
+}
+
+function updateTextStats() {
+    const validCount = textModeData.squares.size;
+    const conflictCount = textModeData.conflictSquares.size;
+    const total = validCount * SQUARE_PRICE;
+
+    // Show/hide conflict warning (but don't block donation)
+    const conflictWarning = document.getElementById('text-conflicts');
+    if (conflictCount > 0) {
+        conflictWarning.classList.remove('hidden');
+        conflictWarning.textContent = `ℹ️ ${conflictCount} pixel hoppar över (redan donerade, visas röda) - inget problem!`;
+    } else {
+        conflictWarning.classList.add('hidden');
+    }
+
+    // Update donate button (allow donation even with conflicts)
+    document.getElementById('donate-btn').disabled = validCount === 0;
+    document.getElementById('selected-count').textContent = validCount;
+    document.getElementById('total-amount').textContent = total;
+}
+
 // Re-render highlighted squares (called after renderDonations to keep them on top)
 function rehighlightSquares() {
     if (highlightedSquares.length === 0 || !donationMap) return;
@@ -782,6 +1205,12 @@ function rehighlightSquares() {
     highlightedSquares.forEach((key, index) => {
         const [lat, lng] = key.split('_').map(n => n / 100000);
         console.log(`Highlighting square ${index + 1}:`, key, '→', lat, lng);
+
+        // Get square data to check if it's a text-mode donation with custom color
+        const squareInfo = squareData[key];
+        const isTextMode = squareInfo && squareInfo.mode === 'text';
+        const customColor = isTextMode ? squareInfo.color : '#FFD700';
+        const borderColor = isTextMode ? squareInfo.color : '#FF4500';
 
         // Calculate square boundaries (approximately 1 meter square)
         // At this latitude, 1 meter ≈ 0.000009 degrees latitude
@@ -799,9 +1228,9 @@ function rehighlightSquares() {
 
         // Draw the actual square meter outline (larger and interactive)
         const squarePolygon = L.polygon(squareBounds, {
-            color: '#FF4500',       // Orange-red border
+            color: borderColor,       // Custom color for text mode, orange-red otherwise
             weight: 4,
-            fillColor: '#FFD700',   // Gold fill
+            fillColor: customColor,   // Custom color for text mode, gold otherwise
             fillOpacity: 0.6,
             className: 'highlighted-square-polygon',
             pane: 'markerPane',
@@ -811,16 +1240,15 @@ function rehighlightSquares() {
         // Create large clickable marker at center
         const highlightMarker = L.circleMarker([lat, lng], {
             radius: 12,            // Larger radius for easier clicking
-            fillColor: '#FFD700',  // Bright gold
+            fillColor: customColor,  // Custom color for text mode, gold otherwise
             fillOpacity: 0.9,
-            color: '#FF4500',      // Orange-red border
+            color: borderColor,      // Custom color for text mode, orange-red otherwise
             weight: 4,
             className: 'highlighted-square-marker',
             pane: 'markerPane'
         }).addTo(donationMap);
 
         // Add popup with donor info if available
-        const squareInfo = squareData[key];
         let popupContent;
 
         if (squareInfo) {

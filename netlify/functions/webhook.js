@@ -49,6 +49,7 @@ exports.handler = async (event, context) => {
             const donorName = session.metadata.donorName;
             const donorGreeting = session.metadata.donorGreeting || null;
             const squares = JSON.parse(session.metadata.squares);
+            const modeData = session.metadata.modeData ? JSON.parse(session.metadata.modeData) : { mode: 'click' };
             const timestamp = new Date().toISOString();
 
             // Save donation data
@@ -59,12 +60,13 @@ exports.handler = async (event, context) => {
                     donorGreeting,
                     squares,
                     amount: session.amount_total / 100, // Convert from öre to SEK
+                    modeData,
                     timestamp,
                     sessionId: session.id,
                     paymentStatus: session.payment_status,
                 });
 
-                console.log('Donation saved:', { donorName, squareCount: squares.length });
+                console.log('Donation saved:', { donorName, squareCount: squares.length, mode: modeData.mode });
             } catch (error) {
                 console.error('Error saving donation:', error);
             }
