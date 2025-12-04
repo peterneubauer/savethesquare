@@ -649,22 +649,23 @@ async function loadSquareData() {
         const response = await fetch(`${CONFIG.apiUrl}/api/get-donations`);
         if (response.ok) {
             const data = await response.json();
-            if (data.squareData && Object.keys(data.squareData).length > 0) {
-                squareData = data.squareData;
-                console.log(`Loaded ${Object.keys(squareData).length} donated squares from server`);
-                renderDonations();
-                return;
-            }
+            // Always use server data, even if empty (it's the source of truth)
+            squareData = data.squareData || {};
+            console.log(`✅ Loaded ${Object.keys(squareData).length} donated squares from server (Supabase)`);
+            renderDonations();
+            return;
+        } else {
+            console.warn('Server returned error:', response.status);
         }
     } catch (error) {
-        console.warn('Could not load donations from server, falling back to localStorage:', error);
+        console.warn('⚠️ Could not connect to server, falling back to localStorage:', error);
     }
 
-    // Fallback to localStorage (for local development/testing)
+    // Fallback to localStorage only if API call failed
     const saved = localStorage.getItem('squareData');
     if (saved) {
         squareData = JSON.parse(saved);
-        console.log(`Loaded ${Object.keys(squareData).length} donated squares from localStorage`);
+        console.log(`📦 Loaded ${Object.keys(squareData).length} donated squares from localStorage (offline mode)`);
         renderDonations();
     }
 }
