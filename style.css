@@ -924,23 +924,14 @@ footer p {
 }
 
 /* Leaflet marker styles for highlighted squares */
-.pulsing-marker {
-    animation: pulse 2s ease-in-out infinite;
+.highlighted-square-marker {
     z-index: 1000 !important;
-}
-
-.highlighted-square {
-    z-index: 1000 !important;
+    cursor: pointer;
 }
 
 .highlighted-square-polygon {
-    animation: polygon-pulse 2s ease-in-out infinite;
     z-index: 998 !important;
-}
-
-.highlighted-glow {
-    animation: glow-pulse 2s ease-in-out infinite;
-    z-index: 999 !important;
+    cursor: pointer;
 }
 
 /* Enhanced Leaflet popup styling for highlighted squares */

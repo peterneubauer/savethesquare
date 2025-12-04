@@ -794,38 +794,25 @@ function rehighlightSquares() {
             [lat - meterInDegLat/2, lng - meterInDegLng/2]   // Close the square
         ];
 
-        // Draw the actual square meter outline
-        L.polygon(squareBounds, {
+        // Draw the actual square meter outline (larger and interactive)
+        const squarePolygon = L.polygon(squareBounds, {
             color: '#FF4500',       // Orange-red border
-            weight: 3,
+            weight: 4,
             fillColor: '#FFD700',   // Gold fill
-            fillOpacity: 0.4,
+            fillOpacity: 0.6,
             className: 'highlighted-square-polygon',
             pane: 'markerPane',
-            interactive: false      // Disable interactions to prevent clicks
+            interactive: true       // Make clickable
         }).addTo(donationMap);
 
-        // Create outer glow (larger circle for emphasis)
-        L.circleMarker([lat, lng], {
-            radius: 15,
-            fillColor: '#FFD700',
-            fillOpacity: 0.2,
-            color: '#FFD700',
-            weight: 2,
-            opacity: 0.6,
-            className: 'highlighted-glow',
-            pane: 'markerPane',
-            interactive: false      // Disable interactions to prevent clicks
-        }).addTo(donationMap);
-
-        // Create main pulsing highlighted marker (center point)
+        // Create large clickable marker at center
         const highlightMarker = L.circleMarker([lat, lng], {
-            radius: 6,
+            radius: 12,            // Larger radius for easier clicking
             fillColor: '#FFD700',  // Bright gold
-            fillOpacity: 1,
-            color: '#FF4500',  // Orange-red border
-            weight: 3,
-            className: 'highlighted-square pulsing-marker',
+            fillOpacity: 0.9,
+            color: '#FF4500',      // Orange-red border
+            weight: 4,
+            className: 'highlighted-square-marker',
             pane: 'markerPane'
         }).addTo(donationMap);
 
@@ -856,56 +843,83 @@ function rehighlightSquares() {
                </div>`;
         }
 
+        // Bind popup to both the marker and the polygon
         highlightMarker.bindPopup(popupContent);
+        squarePolygon.bindPopup(popupContent);
 
         // Open popup automatically for the first highlighted square
         if (index === 0) {
             setTimeout(() => {
                 highlightMarker.openPopup();
-            }, 800); // Small delay to let the animation settle
+            }, 800); // Small delay to let the map settle
         }
     });
 }
 
 // Check if URL has highlight parameter to show specific donated squares
-function checkHighlightParameter() {
+async function checkHighlightParameter() {
     const urlParams = new URLSearchParams(window.location.search);
     const highlightParam = urlParams.get('highlight');
+    const donationId = urlParams.get('donation_id');
 
     console.log('=== HIGHLIGHT CHECK ===');
     console.log('URL params:', window.location.search);
     console.log('Highlight param:', highlightParam);
+    console.log('Donation ID param:', donationId);
     console.log('Donation map exists:', !!donationMap);
 
-    if (highlightParam && donationMap) {
-        highlightedSquares = highlightParam.split(',');
-        console.log('Highlighted squares:', highlightedSquares);
+    if (!donationMap) return;
 
-        // Wait a bit for map to fully render
-        setTimeout(() => {
-            console.log('=== RENDERING HIGHLIGHTS ===');
-            // Clear existing highlighted markers
-            donationMap.eachLayer(layer => {
-                if ((layer instanceof L.CircleMarker || layer instanceof L.Polygon) &&
-                    layer.options.className?.includes('highlighted')) {
-                    donationMap.removeLayer(layer);
-                }
+    // If donation_id is provided, fetch squares from API
+    if (donationId) {
+        try {
+            console.log('Fetching donation by ID:', donationId);
+            const response = await fetch(`${CONFIG.apiUrl}/api/get-donation-by-id?id=${donationId}`);
+            if (response.ok) {
+                const data = await response.json();
+                highlightedSquares = data.squares || [];
+                console.log('Loaded squares from donation:', highlightedSquares);
+            } else {
+                console.error('Failed to fetch donation:', response.status);
+                return;
+            }
+        } catch (error) {
+            console.error('Error fetching donation by ID:', error);
+            return;
+        }
+    }
+    // Otherwise, use comma-separated highlight parameter
+    else if (highlightParam) {
+        highlightedSquares = highlightParam.split(',');
+        console.log('Highlighted squares from URL:', highlightedSquares);
+    } else {
+        return; // No highlight parameter
+    }
+
+    // Wait a bit for map to fully render
+    setTimeout(() => {
+        console.log('=== RENDERING HIGHLIGHTS ===');
+        // Clear existing highlighted markers
+        donationMap.eachLayer(layer => {
+            if ((layer instanceof L.CircleMarker || layer instanceof L.Polygon) &&
+                layer.options.className?.includes('highlighted')) {
+                donationMap.removeLayer(layer);
+            }
+        });
+
+        // Render highlighted squares
+        rehighlightSquares();
+
+        // Pan to first highlighted square with smooth animation
+        if (highlightedSquares.length > 0) {
+            const [lat, lng] = highlightedSquares[0].split('_').map(n => n / 100000);
+            donationMap.flyTo([lat, lng], 18, {
+                duration: 1.5,
+                easeLinearity: 0.25
             });
 
-            // Render highlighted squares
-            rehighlightSquares();
-
-            // Pan to first highlighted square with smooth animation
-            if (highlightedSquares.length > 0) {
-                const [lat, lng] = highlightedSquares[0].split('_').map(n => n / 100000);
-                donationMap.flyTo([lat, lng], 18, {
-                    duration: 1.5,
-                    easeLinearity: 0.25
-                });
-
-                // Don't auto-open popup - let user click to see details
-                // This prevents animation restarts
-            }
-        }, 500); // Short delay to let map finish rendering tiles
-    }
+            // Don't auto-open popup - let user click to see details
+            // This prevents animation restarts
+        }
+    }, 500); // Short delay to let map finish rendering tiles
 }
