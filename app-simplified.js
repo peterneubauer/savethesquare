@@ -257,10 +257,13 @@ function renderDonations() {
     for (const [key, data] of Object.entries(squareData)) {
         const [lat, lng] = key.split('_').map(n => n / 100000);
         L.circleMarker([lat, lng], {
-            radius: 3,
-            fillColor: '#4a7c2c',
-            fillOpacity: 0.8,
-            stroke: false
+            radius: 6,
+            fillColor: '#27ae60',
+            fillOpacity: 0.95,
+            stroke: true,
+            color: '#1e8449',
+            weight: 2,
+            opacity: 1
         }).addTo(donationMap).bindPopup(`Donerad av: ${data.donor}`);
     }
 

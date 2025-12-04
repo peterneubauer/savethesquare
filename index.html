@@ -3,17 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Save The Square - Rädda Visne Ängar</title>
+    <title>Rädda Kvadraten - Rädda Visne Ängar</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <header class="site-header">
+        <div class="container header-container">
+            <div class="header-brand">
+                <h1 class="site-logo">RÄDDA KVADRATEN</h1>
+                <p class="site-tagline">Rädda Visne Ängar</p>
+            </div>
+            <div class="header-partner">
+                <span class="partner-label">I samarbete med</span>
+                <a href="https://www.framtidensnatur.se" target="_blank" rel="noopener" class="partner-logo-link">
+                    <img src="media/framtidens-natur-logo.svg" alt="Stiftelsen för Framtidens Natur- och Kulturarv" class="partner-logo">
+                </a>
+            </div>
+        </div>
+    </header>
+
     <main>
         <section class="hero">
             <div class="hero-image-overlay"></div>
             <div class="container hero-container">
                 <div class="hero-content">
-                    <h1 class="hero-title">SAVE THE SQUARE</h1>
+                    <h1 class="hero-title">RÄDDA KVADRATEN</h1>
                     <p class="hero-subtitle">Rädda Visne Ängar - En kvadratmeter i taget</p>
                     <p class="hero-description">Visne Ängar på Gotland är ett unikt naturområde som behöver skyddas.
                     För endast <strong>20 SEK</strong> kan du "adoptera" en kvadratmeter och bidra till bevarandet.</p>
@@ -64,6 +79,71 @@
                         Donera <span id="selected-count">0</span> kvadratmeter (<span id="total-amount">0</span> SEK)
                     </button>
                     <button id="clear-selection-btn" class="btn-secondary" disabled>Rensa val</button>
+                </div>
+            </div>
+        </section>
+
+        <section class="story-section">
+            <div class="container">
+                <h2 class="section-title">Historien bakom Visne Ängar</h2>
+                <p class="section-subtitle">En innovativ modell för att skydda naturen - permanent</p>
+
+                <div class="story-content">
+                    <div class="story-text">
+                        <h3>Ett levande arv sedan 2000 år</h3>
+                        <p class="lead-text">Visne Ängar är inte bara ett naturområde – det är ett levande kulturarv som har formats genom tusentals års hållbar betesdrift. Detta 93 hektar stora område representerar det Peter Neubauer beskriver som <em>"ett levande vittnesbörd om den hållbara samlevnaden mellan människor och natur"</em>.</p>
+
+                        <p>Den historiska betesverksamheten har skapat unika ekosystem som hyser hotade arter och upprätthåller en biologisk mångfald som annars skulle gå förlorad.</p>
+
+                        <h3>En ny modell för naturskydd</h3>
+                        <p>Peter Neubauer har utvecklat en innovativ samarbetsmodell tillsammans med <strong>Stiftelsen för Framtidens Natur- och Kulturarv</strong> (<a href="https://www.framtidensnatur.se" target="_blank" rel="noopener">framtidensnatur.se</a>) – en svensk organisation dedikerad till att bevara landskap med både ekologisk och historisk betydelse.</p>
+
+                        <div class="model-steps">
+                            <h4>Så fungerar modellen:</h4>
+                            <ol>
+                                <li><strong>Privat förvärv:</strong> Peter köper marken som privatperson med kommunalt godkännande</li>
+                                <li><strong>Omedelbar förvaltning:</strong> Stiftelsen tar över driften och skötseln direkt</li>
+                                <li><strong>Finansiering:</strong> Din donation bidrar till att påskynda processen</li>
+                                <li><strong>Permanent skydd:</strong> Stiftelsen köper sedan marken till ursprungspriset (inflationsjusterat) och säkerställer att den förblir skyddad för evigt</li>
+                                <li><strong>Uppskalning:</strong> Pengarna återinvesteras i nya naturområden – målet är att skydda över 1000 hektar</li>
+                            </ol>
+                        </div>
+
+                        <h3>Din roll i berättelsen</h3>
+                        <p>Genom att "adoptera" en kvadratmeter bidrar du till tre viktiga mål:</p>
+                        <ul class="impact-list">
+                            <li><strong>Påskynda uppköpet</strong> av Visne Ängar från Peter Neubauer</li>
+                            <li><strong>Möjliggöra återinvestering</strong> i nästa naturområde som behöver skydd</li>
+                            <li><strong>Bevisa att modellen fungerar</strong> – att mark lagligt kan överföras till stiftelsen för permanent skydd</li>
+                        </ul>
+
+                        <p class="closing-text">Som Peter Neubauer uttrycker det: <em>"Detta är en mycket sund och stabil investering"</em> – inte bara ekonomiskt, utan framför allt för kommande generationers möjlighet att uppleva en levande, mångfaldig natur.</p>
+                    </div>
+
+                    <div class="story-sidebar">
+                        <div class="info-box founder-box">
+                            <h4>Peter Neubauer</h4>
+                            <p>Initiativtagare och visionär bakom denna innovativa modell för naturskydd genom privat-offentligt samarbete.</p>
+                        </div>
+
+                        <div class="info-box foundation-box">
+                            <a href="https://www.framtidensnatur.se" target="_blank" rel="noopener" class="foundation-logo-box">
+                                <img src="media/framtidens-natur-logo.svg" alt="Stiftelsen för Framtidens Natur- och Kulturarv" class="foundation-logo-inline">
+                            </a>
+                            <h4>Stiftelsen för Framtidens Natur- och Kulturarv</h4>
+                            <p>Partner i projektet som säkerställer långsiktig förvaltning och permanent skydd av Visne Ängar.</p>
+                            <a href="https://www.framtidensnatur.se" target="_blank" rel="noopener" class="foundation-link">Besök framtidensnatur.se →</a>
+                        </div>
+
+                        <div class="info-box impact-box">
+                            <h4>Målsättning</h4>
+                            <div class="impact-stat">
+                                <span class="impact-number">1000+</span>
+                                <span class="impact-label">hektar naturskydd</span>
+                            </div>
+                            <p>Modellen kan skalas upp för att skydda över 1000 hektar värdefull natur tillsammans med flera markägare.</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </section>
@@ -153,7 +233,20 @@
 
     <footer>
         <div class="container">
-            <p>&copy; 2025 Save The Square | Projekt för bevarande av Visne Ängar, Gotland</p>
+            <div class="footer-content">
+                <div class="footer-info">
+                    <h3>Rädda Kvadraten</h3>
+                    <p>Rädda Visne Ängar – Ett naturbevarandeprojekt på Gotland</p>
+                    <p class="footer-copyright">&copy; 2025 Rädda Kvadraten</p>
+                </div>
+                <div class="footer-partner">
+                    <p class="footer-partner-label">I samarbete med</p>
+                    <a href="https://www.framtidensnatur.se" target="_blank" rel="noopener" class="footer-partner-logo-link">
+                        <img src="media/framtidens-natur-logo.svg" alt="Stiftelsen för Framtidens Natur- och Kulturarv" class="footer-partner-logo">
+                    </a>
+                    <p class="footer-partner-desc">Stiftelsen för Framtidens Natur- och Kulturarv</p>
+                </div>
+            </div>
         </div>
     </footer>
 
