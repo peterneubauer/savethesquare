@@ -19,7 +19,7 @@ module.exports = async (req, res) => {
     }
 
     try {
-        const { squares, donorName, donorEmail } = req.body;
+        const { squares, donorName, donorEmail, donorGreeting } = req.body;
 
         if (!squares || !Array.isArray(squares) || squares.length === 0) {
             return res.status(400).json({ error: 'Invalid squares data' });
@@ -55,6 +55,7 @@ module.exports = async (req, res) => {
             customer_email: donorEmail,
             metadata: {
                 donorName: donorName,
+                donorGreeting: donorGreeting || '',
                 squareCount: squareCount.toString(),
                 squares: JSON.stringify(squares),
             },

@@ -396,6 +396,32 @@ async function completeDonation(squares, donorName, donorEmail, donorGreeting = 
     const timestamp = new Date().toISOString();
     const amount = squares.length * SQUARE_PRICE;
 
+    // Save to Supabase (works in both test and production mode)
+    try {
+        const saveResponse = await fetch(`${CONFIG.apiUrl}/api/save-donation`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                donorName,
+                donorEmail,
+                donorGreeting,
+                squares,
+                amount
+            })
+        });
+
+        if (saveResponse.ok) {
+            console.log('✅ Donation saved to Supabase');
+        } else {
+            console.warn('⚠️ Failed to save donation to Supabase, using localStorage fallback');
+        }
+    } catch (error) {
+        console.error('Error saving to Supabase:', error);
+    }
+
+    // Also update local state for immediate UI feedback
     squares.forEach(key => {
         squareData[key] = {
             donor: donorName,
