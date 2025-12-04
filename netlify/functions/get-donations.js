@@ -1,22 +1,28 @@
 // API endpoint to retrieve all donations
 // Returns square donation data for rendering on the map
+// Netlify Function format
 
 const fs = require('fs');
 const path = require('path');
 
-module.exports = async (req, res) => {
-    // Enable CORS
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+exports.handler = async (event, context) => {
+    const headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Methods': 'GET, OPTIONS'
+    };
 
     // Handle preflight
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
+    if (event.httpMethod === 'OPTIONS') {
+        return { statusCode: 200, headers, body: '' };
     }
 
-    if (req.method !== 'GET') {
-        return res.status(405).json({ error: 'Method not allowed' });
+    if (event.httpMethod !== 'GET') {
+        return {
+            statusCode: 405,
+            headers,
+            body: JSON.stringify({ error: 'Method not allowed' })
+        };
     }
 
     try {
@@ -41,13 +47,21 @@ module.exports = async (req, res) => {
             });
         });
 
-        res.status(200).json({
-            squareData,
-            totalDonations: donations.length,
-            totalSquares: Object.keys(squareData).length,
-        });
+        return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify({
+                squareData,
+                totalDonations: donations.length,
+                totalSquares: Object.keys(squareData).length,
+            })
+        };
     } catch (error) {
         console.error('Error reading donations:', error);
-        res.status(500).json({ error: error.message });
+        return {
+            statusCode: 500,
+            headers,
+            body: JSON.stringify({ error: error.message })
+        };
     }
 };

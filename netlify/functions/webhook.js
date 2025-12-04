@@ -1,32 +1,50 @@
 // Stripe webhook handler for payment confirmations
-// Compatible with Vercel/Netlify
+// Netlify Function format
 
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const fs = require('fs');
 const path = require('path');
 
-module.exports = async (req, res) => {
-    if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
+exports.handler = async (event, context) => {
+    const headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type, Stripe-Signature',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS'
+    };
+
+    if (event.httpMethod === 'OPTIONS') {
+        return { statusCode: 200, headers, body: '' };
     }
 
-    const sig = req.headers['stripe-signature'];
+    if (event.httpMethod !== 'POST') {
+        return {
+            statusCode: 405,
+            headers,
+            body: JSON.stringify({ error: 'Method not allowed' })
+        };
+    }
+
+    const sig = event.headers['stripe-signature'];
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
-    let event;
+    let stripeEvent;
 
     try {
         // Verify webhook signature
-        event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+        stripeEvent = stripe.webhooks.constructEvent(event.body, sig, webhookSecret);
     } catch (err) {
         console.error('Webhook signature verification failed:', err.message);
-        return res.status(400).send(`Webhook Error: ${err.message}`);
+        return {
+            statusCode: 400,
+            headers,
+            body: JSON.stringify({ error: `Webhook Error: ${err.message}` })
+        };
     }
 
     // Handle the event
-    switch (event.type) {
+    switch (stripeEvent.type) {
         case 'checkout.session.completed':
-            const session = event.data.object;
+            const session = stripeEvent.data.object;
 
             // Extract metadata
             const donorName = session.metadata.donorName;
@@ -52,10 +70,14 @@ module.exports = async (req, res) => {
             break;
 
         default:
-            console.log(`Unhandled event type: ${event.type}`);
+            console.log(`Unhandled event type: ${stripeEvent.type}`);
     }
 
-    res.status(200).json({ received: true });
+    return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ received: true })
+    };
 };
 
 // Helper function to save donation

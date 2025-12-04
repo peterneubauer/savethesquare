@@ -643,10 +643,28 @@ function displayEmailPreview(preview) {
     previewWindow.document.close();
 }
 
-function loadSquareData() {
+async function loadSquareData() {
+    // Try to load from API first (shows donations from all users)
+    try {
+        const response = await fetch(`${CONFIG.apiUrl}/api/get-donations`);
+        if (response.ok) {
+            const data = await response.json();
+            if (data.squareData && Object.keys(data.squareData).length > 0) {
+                squareData = data.squareData;
+                console.log(`Loaded ${Object.keys(squareData).length} donated squares from server`);
+                renderDonations();
+                return;
+            }
+        }
+    } catch (error) {
+        console.warn('Could not load donations from server, falling back to localStorage:', error);
+    }
+
+    // Fallback to localStorage (for local development/testing)
     const saved = localStorage.getItem('squareData');
     if (saved) {
         squareData = JSON.parse(saved);
+        console.log(`Loaded ${Object.keys(squareData).length} donated squares from localStorage`);
         renderDonations();
     }
 }
