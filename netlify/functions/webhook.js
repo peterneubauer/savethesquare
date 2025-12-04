@@ -2,8 +2,7 @@
 // Netlify Function format
 
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-const fs = require('fs');
-const path = require('path');
+const { saveDonation } = require('./lib/supabase');
 
 exports.handler = async (event, context) => {
     const headers = {
@@ -80,29 +79,3 @@ exports.handler = async (event, context) => {
     };
 };
 
-// Helper function to save donation
-async function saveDonation(donationData) {
-    // In production, save to a database (PostgreSQL, MongoDB, etc.)
-    // For now, we'll save to a JSON file
-
-    const donationsFile = path.join('/tmp', 'donations.json');
-
-    let donations = [];
-
-    try {
-        if (fs.existsSync(donationsFile)) {
-            const fileContent = fs.readFileSync(donationsFile, 'utf8');
-            donations = JSON.parse(fileContent);
-        }
-    } catch (error) {
-        console.error('Error reading donations file:', error);
-    }
-
-    // Add new donation
-    donations.push(donationData);
-
-    // Save back to file
-    fs.writeFileSync(donationsFile, JSON.stringify(donations, null, 2));
-
-    return donationData;
-}

@@ -9,14 +9,21 @@
     "build": "node build.js",
     "netlify-dev": "netlify dev"
   },
-  "keywords": ["conservation", "donation", "halland", "nature", "ustorp"],
+  "keywords": [
+    "conservation",
+    "donation",
+    "halland",
+    "nature",
+    "ustorp"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "stripe": "^14.0.0",
     "@sendgrid/mail": "^8.1.0",
+    "@sparticuz/chromium": "^119.0.0",
+    "@supabase/supabase-js": "^2.86.0",
     "puppeteer-core": "^21.0.0",
-    "@sparticuz/chromium": "^119.0.0"
+    "stripe": "^14.0.0"
   },
   "devDependencies": {
     "netlify-cli": "^17.0.0"

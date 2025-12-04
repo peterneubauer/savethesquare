@@ -2,8 +2,7 @@
 // Returns square donation data for rendering on the map
 // Netlify Function format
 
-const fs = require('fs');
-const path = require('path');
+const { getAllDonations, transformToSquareData } = require('./lib/supabase');
 
 exports.handler = async (event, context) => {
     const headers = {
@@ -26,26 +25,11 @@ exports.handler = async (event, context) => {
     }
 
     try {
-        const donationsFile = path.join('/tmp', 'donations.json');
+        // Fetch all donations from Supabase
+        const donations = await getAllDonations();
 
-        let donations = [];
-
-        if (fs.existsSync(donationsFile)) {
-            const fileContent = fs.readFileSync(donationsFile, 'utf8');
-            donations = JSON.parse(fileContent);
-        }
-
-        // Transform donations into square data format
-        const squareData = {};
-
-        donations.forEach(donation => {
-            donation.squares.forEach(squareKey => {
-                squareData[squareKey] = {
-                    donor: donation.donorName,
-                    timestamp: donation.timestamp,
-                };
-            });
-        });
+        // Transform donations into square data format for the map
+        const squareData = transformToSquareData(donations);
 
         return {
             statusCode: 200,
