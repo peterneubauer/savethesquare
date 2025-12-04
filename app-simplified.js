@@ -8,12 +8,13 @@ let selectedSquares = new Set();
 let donationMap = null;
 let propertyData = null;
 let canvasOverlay = null;
+let highlightedSquares = []; // Store highlighted square keys for re-rendering
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     loadPropertyData();
     checkPaymentStatus();
-    checkHighlightParameter();
+    // checkHighlightParameter will be called after map is initialized
 });
 
 async function loadPropertyData() {
@@ -26,6 +27,9 @@ async function loadPropertyData() {
         loadSquareData();
         setupEventListeners();
         updateStats();
+
+        // Check for highlight parameter after map is initialized
+        checkHighlightParameter();
     } catch (error) {
         console.error('Error loading property data:', error);
     }
@@ -51,6 +55,7 @@ function initDonationMap() {
         donationMap = L.map('donation-map-leaflet', {
             center: [centerLat, centerLon],
             zoom: 17,
+            maxZoom: 19,  // Prevent zooming beyond level 19 to ensure satellite tiles are available
             zoomControl: false,
             attributionControl: true
         });
@@ -61,10 +66,12 @@ function initDonationMap() {
         return;
     }
 
-    // Add satellite imagery
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-        attribution: 'Esri',
-        maxZoom: 20
+    // Add satellite imagery with multiple sources for better coverage
+    // Using Google Satellite as primary (better high-zoom coverage)
+    L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+        attribution: 'Google',
+        maxZoom: 20,
+        maxNativeZoom: 20
     }).addTo(donationMap);
 
     // First, add an inverse mask to blur/darken everything outside the property
@@ -228,9 +235,16 @@ function pointInRing(lon, lat, ring) {
 }
 
 function renderDonations() {
-    // Clear existing markers
+    // Check if map is initialized
+    if (!donationMap) {
+        console.warn('Donation map not initialized yet');
+        return;
+    }
+
+    // Clear existing markers EXCEPT highlighted ones
     donationMap.eachLayer(layer => {
-        if (layer instanceof L.CircleMarker) {
+        if ((layer instanceof L.CircleMarker || layer instanceof L.Polygon) &&
+            !layer.options.className?.includes('highlighted')) {
             donationMap.removeLayer(layer);
         }
     });
@@ -256,6 +270,9 @@ function renderDonations() {
             stroke: false
         }).addTo(donationMap);
     });
+
+    // Re-render highlighted squares if they exist (to keep them on top)
+    rehighlightSquares();
 }
 
 // Initialize location map (same as before)
@@ -335,6 +352,43 @@ async function handleDonationSubmit(e) {
         if (confirmed) {
             completeDonation(squares, donorName, donorEmail, donorGreeting);
         }
+    } else {
+        // Production mode - use real Stripe Checkout
+        try {
+            // Store donation details for after payment
+            localStorage.setItem('pendingDonation', JSON.stringify({
+                squares,
+                donorName,
+                donorEmail,
+                donorGreeting
+            }));
+
+            // Create Stripe Checkout Session
+            const response = await fetch(`${CONFIG.apiUrl}/api/create-checkout`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    squares,
+                    donorName,
+                    donorEmail,
+                    donorGreeting
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to create checkout session');
+            }
+
+            const { url } = await response.json();
+
+            // Redirect to Stripe Checkout
+            window.location.href = url;
+        } catch (error) {
+            console.error('Stripe checkout error:', error);
+            alert('Ett fel uppstod vid betalningen. Försök igen senare.');
+        }
     }
 }
 
@@ -373,7 +427,7 @@ async function completeDonation(squares, donorName, donorEmail, donorGreeting = 
                 donorGreeting,
                 squares,
                 amount,
-                testMode: CONFIG.testMode
+                testMode: CONFIG.emailTestMode !== undefined ? CONFIG.emailTestMode : CONFIG.testMode
             })
         });
 
@@ -613,8 +667,8 @@ function checkPaymentStatus() {
     if (urlParams.get('success') === 'true') {
         const pending = localStorage.getItem('pendingDonation');
         if (pending) {
-            const { squares, donorName, donorEmail } = JSON.parse(pending);
-            completeDonation(squares, donorName, donorEmail);
+            const { squares, donorName, donorEmail, donorGreeting } = JSON.parse(pending);
+            completeDonation(squares, donorName, donorEmail, donorGreeting);
             localStorage.removeItem('pendingDonation');
         } else {
             alert('Betalning genomförd! Tack för ditt stöd! ✅');
@@ -627,41 +681,121 @@ function checkPaymentStatus() {
     }
 }
 
+// Re-render highlighted squares (called after renderDonations to keep them on top)
+function rehighlightSquares() {
+    if (highlightedSquares.length === 0 || !donationMap) return;
+
+    console.log('rehighlightSquares called with', highlightedSquares.length, 'squares');
+
+    highlightedSquares.forEach((key, index) => {
+        const [lat, lng] = key.split('_').map(n => n / 100000);
+        console.log(`Highlighting square ${index + 1}:`, key, '→', lat, lng);
+
+        // Calculate square boundaries (approximately 1 meter square)
+        // At this latitude, 1 meter ≈ 0.000009 degrees latitude
+        // For longitude, we need to account for latitude: 1 meter ≈ 0.000009 / cos(lat)
+        const meterInDegLat = 0.000009;
+        const meterInDegLng = 0.000009 / Math.cos(lat * Math.PI / 180);
+
+        const squareBounds = [
+            [lat - meterInDegLat/2, lng - meterInDegLng/2],  // Southwest
+            [lat - meterInDegLat/2, lng + meterInDegLng/2],  // Southeast
+            [lat + meterInDegLat/2, lng + meterInDegLng/2],  // Northeast
+            [lat + meterInDegLat/2, lng - meterInDegLng/2],  // Northwest
+            [lat - meterInDegLat/2, lng - meterInDegLng/2]   // Close the square
+        ];
+
+        // Draw the actual square meter outline
+        L.polygon(squareBounds, {
+            color: '#FF4500',       // Orange-red border
+            weight: 3,
+            fillColor: '#FFD700',   // Gold fill
+            fillOpacity: 0.4,
+            className: 'highlighted-square-polygon',
+            pane: 'markerPane',
+            interactive: false      // Disable interactions to prevent clicks
+        }).addTo(donationMap);
+
+        // Create outer glow (larger circle for emphasis)
+        L.circleMarker([lat, lng], {
+            radius: 15,
+            fillColor: '#FFD700',
+            fillOpacity: 0.2,
+            color: '#FFD700',
+            weight: 2,
+            opacity: 0.6,
+            className: 'highlighted-glow',
+            pane: 'markerPane',
+            interactive: false      // Disable interactions to prevent clicks
+        }).addTo(donationMap);
+
+        // Create main pulsing highlighted marker (center point)
+        const highlightMarker = L.circleMarker([lat, lng], {
+            radius: 6,
+            fillColor: '#FFD700',  // Bright gold
+            fillOpacity: 1,
+            color: '#FF4500',  // Orange-red border
+            weight: 3,
+            className: 'highlighted-square pulsing-marker',
+            pane: 'markerPane'
+        }).addTo(donationMap);
+
+        // Add popup with donor info if available
+        const squareInfo = squareData[key];
+        const popupContent = squareInfo
+            ? `<div style="text-align: center; padding: 8px;">
+                 <b style="color: #1a5d1a; font-size: 16px;">✨ Din Kvadrat! ✨</b><br>
+                 <span style="color: #666; font-size: 14px;">Donerad av: ${squareInfo.donor || squareInfo.donorName}</span><br>
+                 <span style="font-size: 12px; color: #999;">Tack för ditt bidrag! 💚</span>
+               </div>`
+            : `<div style="text-align: center; padding: 8px;">
+                 <b style="color: #1a5d1a; font-size: 16px;">✨ Din Donerade Kvadrat! ✨</b><br>
+                 <span style="font-size: 12px; color: #999;">Tack för ditt bidrag! 💚</span>
+               </div>`;
+
+        highlightMarker.bindPopup(popupContent);
+    });
+}
+
 // Check if URL has highlight parameter to show specific donated squares
 function checkHighlightParameter() {
     const urlParams = new URLSearchParams(window.location.search);
     const highlightParam = urlParams.get('highlight');
 
-    if (highlightParam && donationMap) {
-        const squaresToHighlight = highlightParam.split(',');
+    console.log('=== HIGHLIGHT CHECK ===');
+    console.log('URL params:', window.location.search);
+    console.log('Highlight param:', highlightParam);
+    console.log('Donation map exists:', !!donationMap);
 
-        // Wait for map to be ready, then highlight squares
+    if (highlightParam && donationMap) {
+        highlightedSquares = highlightParam.split(',');
+        console.log('Highlighted squares:', highlightedSquares);
+
+        // Wait a bit for map to fully render
         setTimeout(() => {
+            console.log('=== RENDERING HIGHLIGHTS ===');
             // Clear existing highlighted markers
             donationMap.eachLayer(layer => {
-                if (layer instanceof L.CircleMarker && layer.options.className === 'highlighted-square') {
+                if ((layer instanceof L.CircleMarker || layer instanceof L.Polygon) &&
+                    layer.options.className?.includes('highlighted')) {
                     donationMap.removeLayer(layer);
                 }
             });
 
-            // Add highlighted markers with special style
-            squaresToHighlight.forEach(key => {
-                const [lat, lng] = key.split('_').map(n => n / 100000);
-                L.circleMarker([lat, lng], {
-                    radius: 5,
-                    fillColor: '#ffd700',  // Gold color for highlight
-                    fillOpacity: 1,
-                    color: '#ff6600',
-                    weight: 2,
-                    className: 'highlighted-square'
-                }).addTo(donationMap).bindPopup(`<b>Din donerade kvadrat!</b>`).openPopup();
-            });
+            // Render highlighted squares
+            rehighlightSquares();
 
-            // Pan to first highlighted square
-            if (squaresToHighlight.length > 0) {
-                const [lat, lng] = squaresToHighlight[0].split('_').map(n => n / 100000);
-                donationMap.setView([lat, lng], 18);
+            // Pan to first highlighted square with smooth animation
+            if (highlightedSquares.length > 0) {
+                const [lat, lng] = highlightedSquares[0].split('_').map(n => n / 100000);
+                donationMap.flyTo([lat, lng], 18, {
+                    duration: 1.5,
+                    easeLinearity: 0.25
+                });
+
+                // Don't auto-open popup - let user click to see details
+                // This prevents animation restarts
             }
-        }, 1000);
+        }, 500); // Short delay to let map finish rendering tiles
     }
 }
