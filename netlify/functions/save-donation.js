@@ -38,6 +38,7 @@ exports.handler = async (event, context) => {
         const donationData = {
             donorName,
             donorEmail,
+            donorGreeting,
             squares,
             amount,
             timestamp: new Date().toISOString(),

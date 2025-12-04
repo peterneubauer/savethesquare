@@ -47,6 +47,7 @@ exports.handler = async (event, context) => {
 
             // Extract metadata
             const donorName = session.metadata.donorName;
+            const donorGreeting = session.metadata.donorGreeting || null;
             const squares = JSON.parse(session.metadata.squares);
             const timestamp = new Date().toISOString();
 
@@ -55,6 +56,7 @@ exports.handler = async (event, context) => {
                 await saveDonation({
                     donorName,
                     donorEmail: session.customer_email,
+                    donorGreeting,
                     squares,
                     amount: session.amount_total / 100, // Convert from öre to SEK
                     timestamp,

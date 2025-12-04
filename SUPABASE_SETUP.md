@@ -25,6 +25,7 @@ CREATE TABLE donations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     donor_name TEXT NOT NULL,
     donor_email TEXT NOT NULL,
+    donor_greeting TEXT,
     squares JSONB NOT NULL,
     amount NUMERIC(10, 2) NOT NULL,
     timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -144,6 +145,7 @@ The `donations` table has the following columns:
 | `id` | UUID | Auto-generated unique ID |
 | `donor_name` | TEXT | Donor's name |
 | `donor_email` | TEXT | Donor's email address |
+| `donor_greeting` | TEXT | Optional personal greeting from donor |
 | `squares` | JSONB | Array of square keys (e.g., `["5736000_1864000"]`) |
 | `amount` | NUMERIC | Donation amount in SEK |
 | `timestamp` | TIMESTAMPTZ | When the donation was made |

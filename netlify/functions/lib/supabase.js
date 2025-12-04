@@ -27,6 +27,7 @@ function getSupabaseClient() {
  * - id: uuid (auto-generated)
  * - donor_name: text
  * - donor_email: text
+ * - donor_greeting: text (optional)
  * - squares: jsonb (array of square keys)
  * - amount: numeric
  * - timestamp: timestamptz
@@ -46,6 +47,7 @@ async function saveDonation(donationData) {
         .insert([{
             donor_name: donationData.donorName,
             donor_email: donationData.donorEmail,
+            donor_greeting: donationData.donorGreeting || null,
             squares: donationData.squares,
             amount: donationData.amount,
             timestamp: donationData.timestamp,
