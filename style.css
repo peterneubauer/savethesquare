@@ -218,6 +218,11 @@ body {
     margin-bottom: 0.75rem;
     letter-spacing: -2px;
     line-height: 1;
+    transition: transform 0.2s ease-out;
+}
+
+.stat-number.updating {
+    animation: counterPulse 0.5s ease-out;
 }
 
 .stat-label {
@@ -902,6 +907,19 @@ footer p {
     }
     100% {
         opacity: 0.4;
+    }
+}
+
+@keyframes counterPulse {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.15);
+        color: var(--accent-green);
+    }
+    100% {
+        transform: scale(1);
     }
 }
 

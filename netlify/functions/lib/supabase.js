@@ -102,6 +102,7 @@ function transformToSquareData(donations) {
             squareData[squareKey] = {
                 donor: donation.donor_name,
                 email: donation.donor_email,
+                greeting: donation.donor_greeting,
                 timestamp: donation.timestamp,
             };
         });

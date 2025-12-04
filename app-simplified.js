@@ -24,9 +24,8 @@ async function loadPropertyData() {
 
         initDonationMap();
         initLocationMap();
-        loadSquareData();
+        loadSquareData(); // This will call updateStats() after loading data
         setupEventListeners();
-        updateStats();
 
         // Check for highlight parameter after map is initialized
         checkHighlightParameter();
@@ -103,7 +102,8 @@ function initDonationMap() {
                 color: 'transparent',
                 fillColor: '#000000',
                 fillOpacity: 0.15,  // Lighter darken effect
-                weight: 0
+                weight: 0,
+                className: 'inverse-mask'
             }
         }).addTo(donationMap);
     });
@@ -111,10 +111,12 @@ function initDonationMap() {
     // Add property boundaries on top
     const geoLayer = L.geoJSON(propertyData, {
         style: {
-            color: '#2d5016',
-            weight: 3,
+            color: '#4caf50',  // Bright green
+            weight: 5,         // Thicker line
             fillColor: 'transparent',
-            fillOpacity: 0
+            fillOpacity: 0,
+            className: 'property-boundary',
+            opacity: 1
         }
     }).addTo(donationMap);
 
@@ -241,10 +243,12 @@ function renderDonations() {
         return;
     }
 
-    // Clear existing markers EXCEPT highlighted ones
+    // Clear existing markers EXCEPT highlighted ones and property boundaries
     donationMap.eachLayer(layer => {
         if ((layer instanceof L.CircleMarker || layer instanceof L.Polygon) &&
-            !layer.options.className?.includes('highlighted')) {
+            !layer.options.className?.includes('highlighted') &&
+            !layer.options.className?.includes('property-boundary') &&
+            !layer.options.className?.includes('inverse-mask')) {
             donationMap.removeLayer(layer);
         }
     });
@@ -679,6 +683,7 @@ async function loadSquareData() {
             squareData = data.squareData || {};
             console.log(`✅ Loaded ${Object.keys(squareData).length} donated squares from server (Supabase)`);
             renderDonations();
+            updateStats(false); // Update stats after loading data
             return;
         } else {
             console.warn('Server returned error:', response.status);
@@ -693,6 +698,7 @@ async function loadSquareData() {
         squareData = JSON.parse(saved);
         console.log(`📦 Loaded ${Object.keys(squareData).length} donated squares from localStorage (offline mode)`);
         renderDonations();
+        updateStats(false); // Update stats after loading data
     }
 }
 
@@ -700,11 +706,49 @@ function saveSquareData() {
     localStorage.setItem('squareData', JSON.stringify(squareData));
 }
 
-function updateStats() {
+function updateStats(animated = true) {
     const donatedCount = Object.keys(squareData).length;
     const totalRaised = donatedCount * SQUARE_PRICE;
-    document.getElementById('donated-squares').textContent = donatedCount.toLocaleString('sv-SE');
-    document.getElementById('total-raised').textContent = totalRaised.toLocaleString('sv-SE');
+
+    if (animated) {
+        animateCounter('donated-squares', donatedCount);
+        animateCounter('total-raised', totalRaised);
+    } else {
+        document.getElementById('donated-squares').textContent = donatedCount.toLocaleString('sv-SE');
+        document.getElementById('total-raised').textContent = totalRaised.toLocaleString('sv-SE');
+    }
+}
+
+function animateCounter(elementId, targetValue) {
+    const element = document.getElementById(elementId);
+    const currentText = element.textContent.replace(/\s/g, ''); // Remove spaces
+    const currentValue = parseInt(currentText) || 0;
+
+    if (currentValue === targetValue) return;
+
+    // Add pulse animation class
+    element.classList.add('updating');
+
+    const duration = 1000; // 1 second animation
+    const steps = 30;
+    const increment = (targetValue - currentValue) / steps;
+    const stepDuration = duration / steps;
+
+    let currentStep = 0;
+
+    const timer = setInterval(() => {
+        currentStep++;
+        const newValue = Math.round(currentValue + (increment * currentStep));
+
+        if (currentStep >= steps) {
+            element.textContent = targetValue.toLocaleString('sv-SE');
+            clearInterval(timer);
+            // Remove animation class after a delay to let it complete
+            setTimeout(() => element.classList.remove('updating'), 500);
+        } else {
+            element.textContent = newValue.toLocaleString('sv-SE');
+        }
+    }, stepDuration);
 }
 
 function checkPaymentStatus() {
@@ -787,18 +831,39 @@ function rehighlightSquares() {
 
         // Add popup with donor info if available
         const squareInfo = squareData[key];
-        const popupContent = squareInfo
-            ? `<div style="text-align: center; padding: 8px;">
-                 <b style="color: #1a5d1a; font-size: 16px;">✨ Din Kvadrat! ✨</b><br>
-                 <span style="color: #666; font-size: 14px;">Donerad av: ${squareInfo.donor || squareInfo.donorName}</span><br>
-                 <span style="font-size: 12px; color: #999;">Tack för ditt bidrag! 💚</span>
-               </div>`
-            : `<div style="text-align: center; padding: 8px;">
+        let popupContent;
+
+        if (squareInfo) {
+            const donorName = squareInfo.donor || squareInfo.donorName || 'Anonym';
+            const greeting = squareInfo.greeting || squareInfo.donorGreeting;
+
+            popupContent = `<div style="text-align: center; padding: 12px; max-width: 250px;">
+                <b style="color: #1a5d1a; font-size: 16px;">✨ Din Kvadrat! ✨</b><br>
+                <span style="color: #666; font-size: 14px; margin-top: 4px; display: block;">Donerad av: <strong>${donorName}</strong></span>`;
+
+            if (greeting) {
+                popupContent += `<div style="margin-top: 8px; padding: 8px; background: #f0f7f0; border-radius: 4px; font-style: italic; color: #2d5016; font-size: 13px;">
+                    "${greeting}"
+                </div>`;
+            }
+
+            popupContent += `<span style="font-size: 12px; color: #999; margin-top: 8px; display: block;">Tack för ditt bidrag! 💚</span>
+              </div>`;
+        } else {
+            popupContent = `<div style="text-align: center; padding: 8px;">
                  <b style="color: #1a5d1a; font-size: 16px;">✨ Din Donerade Kvadrat! ✨</b><br>
                  <span style="font-size: 12px; color: #999;">Tack för ditt bidrag! 💚</span>
                </div>`;
+        }
 
         highlightMarker.bindPopup(popupContent);
+
+        // Open popup automatically for the first highlighted square
+        if (index === 0) {
+            setTimeout(() => {
+                highlightMarker.openPopup();
+            }, 800); // Small delay to let the animation settle
+        }
     });
 }
 
