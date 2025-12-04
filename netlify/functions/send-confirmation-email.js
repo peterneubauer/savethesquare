@@ -1,9 +1,7 @@
-// Netlify Function to send confirmation email with PDF
-// Uses SendGrid for email and Puppeteer for PDF generation
+// Netlify Function to send confirmation email
+// Uses SendGrid for email delivery
 
 const sgMail = require('@sendgrid/mail');
-const puppeteer = require('puppeteer-core');
-const chromium = require('@sparticuz/chromium');
 
 // Only initialize SendGrid if API key is available
 if (process.env.SENDGRID_API_KEY) {
@@ -76,9 +74,9 @@ exports.handler = async (event, context) => {
             };
         }
 
-        // Production mode: Generate PDF and send email
-        // Skip PDF generation in local development
-        const isLocal = !process.env.AWS_LAMBDA_FUNCTION_NAME;
+        // Production mode: Send email without PDF
+        // (PDF generation removed due to Chromium dependency issues on Netlify)
+        // Users can view their squares via the highlight URL link
 
         const msg = {
             to: donorEmail,
@@ -87,21 +85,6 @@ exports.handler = async (event, context) => {
             text: emailText,
             html: emailHTML,
         };
-
-        // Only generate and attach PDF in production (on Netlify)
-        if (!isLocal) {
-            const pdfBuffer = await generateMapPDF(highlightUrl, donorName, squares.length);
-            msg.attachments = [
-                {
-                    content: pdfBuffer.toString('base64'),
-                    filename: `visne-angar-donation-${donorName.replace(/\s+/g, '-')}.pdf`,
-                    type: 'application/pdf',
-                    disposition: 'attachment'
-                }
-            ];
-        } else {
-            console.log('⚠️  Skipping PDF generation in local development');
-        }
 
         await sgMail.send(msg);
 
@@ -120,42 +103,6 @@ exports.handler = async (event, context) => {
     }
 };
 
-// Generate PDF with map screenshot
-async function generateMapPDF(highlightUrl, donorName, squareCount) {
-    // Detect if running locally or on Netlify
-    const isLocal = !process.env.AWS_LAMBDA_FUNCTION_NAME;
-
-    const browser = await puppeteer.launch({
-        args: isLocal ? ['--no-sandbox', '--disable-setuid-sandbox'] : chromium.args,
-        defaultViewport: isLocal ? { width: 1920, height: 1080 } : chromium.defaultViewport,
-        executablePath: isLocal ? undefined : await chromium.executablePath(), // Use system Chrome locally
-        headless: isLocal ? true : chromium.headless,
-    });
-
-    const page = await browser.newPage();
-
-    // Navigate to the highlight URL
-    await page.goto(highlightUrl, { waitUntil: 'networkidle0' });
-
-    // Wait for map to load
-    await page.waitForTimeout(3000);
-
-    // Generate PDF
-    const pdf = await page.pdf({
-        format: 'A4',
-        printBackground: true,
-        margin: {
-            top: '1cm',
-            right: '1cm',
-            bottom: '1cm',
-            left: '1cm'
-        }
-    });
-
-    await browser.close();
-
-    return Buffer.from(pdf);
-}
 
 // Create plain text email
 function createEmailText(donorName, greeting, squareCount, amount, highlightUrl) {
@@ -174,7 +121,7 @@ DONATION DETALJER:
 Se dina donerade kvadratmeter på kartan:
 ${highlightUrl}
 
-Bifogat hittar du en PDF med en karta som visar exakt var dina kvadratmeter finns.
+Klicka på länken ovan för att se en interaktiv karta som visar exakt var dina kvadratmeter finns, med pulsande markeringar!
 
 Ditt bidrag går direkt till bevarande och skötsel av Visne Ängar på Gotland.
 
@@ -290,7 +237,7 @@ function createEmailHTML(donorName, greeting, squareCount, amount, highlightUrl)
             </a>
         </center>
 
-        <p>Bifogat i detta email hittar du en PDF med en karta som visar exakt var dina kvadratmeter finns på Visne Ängar.</p>
+        <p>Klicka på knappen ovan för att se en interaktiv karta som visar exakt var dina kvadratmeter finns på Visne Ängar, med pulsande markeringar!</p>
 
         <p>Ditt bidrag går direkt till bevarande och skötsel av detta unika naturområde.</p>
 
