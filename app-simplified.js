@@ -1341,13 +1341,31 @@ async function checkHighlightParameter() {
         // Render highlighted squares
         rehighlightSquares();
 
-        // Pan to first highlighted square with smooth animation
+        // Zoom to fit all highlighted squares
         if (highlightedSquares.length > 0) {
-            const [lat, lng] = highlightedSquares[0].split('_').map(n => n / 100000);
-            donationMap.flyTo([lat, lng], 18, {
-                duration: 1.5,
-                easeLinearity: 0.25
-            });
+            if (highlightedSquares.length === 1) {
+                // Single square - zoom to it directly
+                const [lat, lng] = highlightedSquares[0].split('_').map(n => n / 100000);
+                donationMap.flyTo([lat, lng], 18, {
+                    duration: 1.5,
+                    easeLinearity: 0.25
+                });
+            } else {
+                // Multiple squares - calculate bounds and fit all
+                const bounds = L.latLngBounds();
+                highlightedSquares.forEach(key => {
+                    const [lat, lng] = key.split('_').map(n => n / 100000);
+                    bounds.extend([lat, lng]);
+                });
+
+                // Fit bounds with padding to ensure all squares are visible
+                donationMap.flyToBounds(bounds, {
+                    padding: [50, 50],
+                    duration: 1.5,
+                    easeLinearity: 0.25,
+                    maxZoom: 18  // Don't zoom in too much
+                });
+            }
 
             // Don't auto-open popup - let user click to see details
             // This prevents animation restarts
