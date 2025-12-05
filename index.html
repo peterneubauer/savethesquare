@@ -83,7 +83,19 @@
                     </small>
                 </p>
 
-                <!-- Text Mode Controls (above map) -->
+                <!-- Shared Selection Controls (always visible) -->
+                <div class="selection-controls">
+                    <div class="selection-control-item">
+                        <label for="text-color">Färg</label>
+                        <input type="color" id="text-color" value="#FFD700">
+                    </div>
+                    <div class="selection-control-item">
+                        <label for="pixel-radius">Radie: <span id="pixel-radius-display">8</span></label>
+                        <input type="range" id="pixel-radius" min="3" max="20" value="8" step="1">
+                    </div>
+                </div>
+
+                <!-- Text Mode Controls (above map, text mode only) -->
                 <div id="text-overlay" class="text-overlay hidden">
                     <div class="text-controls">
                         <div class="text-control-main">
@@ -91,20 +103,12 @@
                         </div>
                         <div class="text-control-grid">
                             <div class="text-control-item">
-                                <label for="text-color">Färg</label>
-                                <input type="color" id="text-color" value="#FFD700">
-                            </div>
-                            <div class="text-control-item">
                                 <label for="font-size">Storlek: <span id="font-size-display">40</span></label>
                                 <input type="range" id="font-size" min="20" max="100" value="40" step="5">
                             </div>
                             <div class="text-control-item">
                                 <label for="pixel-density">Densitet: <span id="pixel-density-display">3</span></label>
                                 <input type="range" id="pixel-density" min="1" max="10" value="3" step="1">
-                            </div>
-                            <div class="text-control-item">
-                                <label for="pixel-radius">Radie: <span id="pixel-radius-display">8</span></label>
-                                <input type="range" id="pixel-radius" min="3" max="20" value="8" step="1">
                             </div>
                         </div>
                         <div class="text-stats">

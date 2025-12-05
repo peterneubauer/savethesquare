@@ -4,56 +4,60 @@
 const SQUARE_PRICE = 20;
 
 let squareData = {};
-let selectedSquares = new Set();
+let selectedSquares = new Set(); // Unified set for both click and text mode
 let donationMap = null;
 let propertyData = null;
 let canvasOverlay = null;
 let highlightedSquares = []; // Store highlighted square keys for re-rendering
 
+// Selection settings (shared between modes)
+let selectionSettings = {
+    color: '#FFD700',
+    pixelRadius: 8
+};
+
 // Text mode variables
 let currentMode = 'click'; // 'click' or 'text'
 let textModeData = {
     text: '',
-    color: '#FFD700',
     fontSize: 40,
     pixelDensity: 3,
-    pixelRadius: 8,
     zoom: 17,
-    squares: new Set(),
-    conflictSquares: new Set()
+    conflictSquares: new Set(),  // Only tracks conflicts in text mode
+    textGeneratedSquares: new Set()  // Track squares generated from text (so we can remove/update them)
 };
 let textPreviewLayers = []; // Store text preview polygon layers
 
 // Load saved settings from localStorage
-function loadTextSettings() {
-    const saved = localStorage.getItem('textModeSettings');
+function loadSettings() {
+    const saved = localStorage.getItem('selectionSettings');
     if (saved) {
         try {
             const settings = JSON.parse(saved);
-            if (settings.color) textModeData.color = settings.color;
+            if (settings.color) selectionSettings.color = settings.color;
+            if (settings.pixelRadius) selectionSettings.pixelRadius = settings.pixelRadius;
             if (settings.fontSize) textModeData.fontSize = settings.fontSize;
             if (settings.pixelDensity) textModeData.pixelDensity = settings.pixelDensity;
-            if (settings.pixelRadius) textModeData.pixelRadius = settings.pixelRadius;
         } catch (e) {
-            console.error('Error loading text settings:', e);
+            console.error('Error loading settings:', e);
         }
     }
 }
 
 // Save settings to localStorage
-function saveTextSettings() {
+function saveSettings() {
     const settings = {
-        color: textModeData.color,
+        color: selectionSettings.color,
+        pixelRadius: selectionSettings.pixelRadius,
         fontSize: textModeData.fontSize,
-        pixelDensity: textModeData.pixelDensity,
-        pixelRadius: textModeData.pixelRadius
+        pixelDensity: textModeData.pixelDensity
     };
-    localStorage.setItem('textModeSettings', JSON.stringify(settings));
+    localStorage.setItem('selectionSettings', JSON.stringify(settings));
 }
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
-    loadTextSettings(); // Load saved settings
+    loadSettings(); // Load saved settings
     loadPropertyData();
     checkPaymentStatus();
     // checkHighlightParameter will be called after map is initialized
@@ -233,6 +237,9 @@ function addCustomZoomControls() {
 }
 
 function handleMapClick(e) {
+    // Only handle clicks in click mode
+    if (currentMode !== 'click') return;
+
     const latlng = e.latlng;
 
     // Check if click is within property
@@ -244,15 +251,14 @@ function handleMapClick(e) {
     // Create a square key (simplified - use lat/lng * 10000 for unique IDs)
     const key = `${Math.floor(latlng.lat * 100000)}_${Math.floor(latlng.lng * 100000)}`;
 
-    if (squareData[key]) {
-        alert(`Denna kvadrat är redan donerad av ${squareData[key].donor}`);
-        return;
-    }
-
-    // Toggle selection
+    // Toggle selection (even if already donated - allows removing squares added from text mode)
     if (selectedSquares.has(key)) {
         selectedSquares.delete(key);
     } else {
+        // Warn if already donated by someone else, but still allow selection
+        if (squareData[key]) {
+            alert(`⚠️ Denna kvadrat är redan donerad av ${squareData[key].donor}`);
+        }
         selectedSquares.add(key);
     }
 
@@ -352,18 +358,21 @@ function renderDonations() {
         }
     }
 
-    // Draw selected squares (click mode only)
-    if (currentMode === 'click') {
-        selectedSquares.forEach(key => {
-            const [lat, lng] = key.split('_').map(n => n / 100000);
-            L.circleMarker([lat, lng], {
-                radius: 3,
-                fillColor: '#ffd54f',
-                fillOpacity: 0.8,
-                stroke: false
-            }).addTo(donationMap);
-        });
-    }
+    // Draw selected squares (both modes - use selectionSettings for appearance)
+    selectedSquares.forEach(key => {
+        // Skip if already donated
+        if (squareData[key]) return;
+
+        const [lat, lng] = key.split('_').map(n => n / 100000);
+        L.circleMarker([lat, lng], {
+            radius: selectionSettings.pixelRadius,
+            fillColor: selectionSettings.color,
+            fillOpacity: 0.8,
+            color: selectionSettings.color,
+            weight: 2,
+            className: 'selected-square'
+        }).addTo(donationMap);
+    });
 
     // Re-render highlighted squares if they exist (to keep them on top)
     rehighlightSquares();
@@ -425,17 +434,17 @@ function setupEventListeners() {
     });
 
     // Load saved settings into UI
-    document.getElementById('text-color').value = textModeData.color;
+    document.getElementById('text-color').value = selectionSettings.color;
     document.getElementById('font-size').value = textModeData.fontSize;
     document.getElementById('font-size-display').textContent = textModeData.fontSize + 'px';
     document.getElementById('pixel-density').value = textModeData.pixelDensity;
     document.getElementById('pixel-density-display').textContent = textModeData.pixelDensity;
-    document.getElementById('pixel-radius').value = textModeData.pixelRadius;
-    document.getElementById('pixel-radius-display').textContent = textModeData.pixelRadius;
+    document.getElementById('pixel-radius').value = selectionSettings.pixelRadius;
+    document.getElementById('pixel-radius-display').textContent = selectionSettings.pixelRadius;
 }
 
 function updateSelectionUI() {
-    const count = currentMode === 'text' ? textModeData.squares.size : selectedSquares.size;
+    const count = selectedSquares.size;
     const total = count * SQUARE_PRICE;
 
     document.getElementById('selected-count').textContent = count;
@@ -445,23 +454,25 @@ function updateSelectionUI() {
 }
 
 function clearSelection() {
+    // Clear all selections from both modes
+    selectedSquares.clear();
+    textModeData.conflictSquares.clear();
+    textModeData.textGeneratedSquares.clear();
+    clearTextPreview();
+
+    // Clear text input if in text mode
     if (currentMode === 'text') {
-        textModeData.squares.clear();
-        textModeData.conflictSquares.clear();
-        clearTextPreview();
-        updateTextStats();
-        // Clear the text input
         document.getElementById('text-input').value = '';
         textModeData.text = '';
-    } else {
-        selectedSquares.clear();
+        updateTextStats();
     }
+
     updateSelectionUI();
     renderDonations();
 }
 
 function openDonationModal() {
-    const count = currentMode === 'text' ? textModeData.squares.size : selectedSquares.size;
+    const count = selectedSquares.size;
     if (count === 0) return;
     const total = count * SQUARE_PRICE;
     document.getElementById('modal-square-count').textContent = count;
@@ -480,26 +491,30 @@ async function handleDonationSubmit(e) {
     const donorEmail = document.getElementById('donor-email').value;
     const donorGreeting = document.getElementById('donor-greeting').value;
 
-    // Get squares based on current mode
-    let squares, amount;
-    let modeData = { mode: currentMode };
+    // Always use unified selectedSquares
+    const squares = Array.from(selectedSquares);
+    const amount = squares.length * SQUARE_PRICE;
 
-    if (currentMode === 'text') {
-        squares = Array.from(textModeData.squares);
-        amount = squares.length * SQUARE_PRICE;
+    // Build mode data - include text info if text was used, otherwise use mixed/click mode
+    let modeData;
+    if (textModeData.text.trim()) {
+        // Text mode was used (even if mixed with clicks)
         modeData = {
             mode: 'text',
             text: textModeData.text,
-            color: textModeData.color,
+            color: selectionSettings.color,
             fontSize: textModeData.fontSize,
             pixelDensity: textModeData.pixelDensity,
-            pixelRadius: textModeData.pixelRadius,
+            pixelRadius: selectionSettings.pixelRadius,
             zoom: textModeData.zoom
         };
     } else {
-        squares = Array.from(selectedSquares);
-        amount = squares.length * SQUARE_PRICE;
-        modeData = { mode: 'click' };
+        // Pure click mode
+        modeData = {
+            mode: 'click',
+            color: selectionSettings.color,
+            pixelRadius: selectionSettings.pixelRadius
+        };
     }
 
     if (CONFIG.testMode) {
@@ -593,8 +608,10 @@ async function completeDonation(squares, donorName, donorEmail, donorGreeting = 
     });
     saveSquareData();
     selectedSquares.clear();
-    textModeData.squares.clear();
     textModeData.conflictSquares.clear();
+    textModeData.textGeneratedSquares.clear();
+    textModeData.text = '';
+    document.getElementById('text-input').value = '';
     clearTextPreview();
     updateSelectionUI();
     renderDonations();
@@ -942,13 +959,10 @@ function switchMode(mode) {
     // Show/hide text overlay
     document.getElementById('text-overlay').classList.toggle('hidden', mode === 'click');
 
-    // Clear selections when switching modes
+    // Don't clear selections - keep them additive
+    // Just clear text preview when leaving text mode
     if (mode === 'click') {
         clearTextPreview();
-        textModeData.squares.clear();
-        textModeData.conflictSquares.clear();
-    } else {
-        selectedSquares.clear();
     }
 
     updateSelectionUI();
@@ -961,35 +975,48 @@ function handleTextInput(e) {
 }
 
 function handleColorChange(e) {
-    textModeData.color = e.target.value;
-    saveTextSettings();
-    updateTextPreview();
+    selectionSettings.color = e.target.value;
+    saveSettings();
+    renderDonations(); // Update all selected squares
+    if (currentMode === 'text') {
+        updateTextPreview();
+    }
 }
 
 function handleFontSizeChange(e) {
     textModeData.fontSize = parseInt(e.target.value);
-    saveTextSettings();
+    saveSettings();
     updateTextPreview();
 }
 
 function handlePixelDensityChange(e) {
     textModeData.pixelDensity = parseInt(e.target.value);
-    saveTextSettings();
+    saveSettings();
     updateTextPreview();
 }
 
 function handlePixelRadiusChange(e) {
-    textModeData.pixelRadius = parseInt(e.target.value);
-    saveTextSettings();
-    updateTextPreview();
+    selectionSettings.pixelRadius = parseInt(e.target.value);
+    saveSettings();
+    renderDonations(); // Update all selected squares
+    if (currentMode === 'text') {
+        updateTextPreview();
+    }
 }
 
 function updateTextPreview() {
+    // First, remove all previously text-generated squares from selection
+    textModeData.textGeneratedSquares.forEach(squareKey => {
+        selectedSquares.delete(squareKey);
+    });
+    textModeData.textGeneratedSquares.clear();
+
     if (!textModeData.text.trim()) {
         clearTextPreview();
-        textModeData.squares.clear();
         textModeData.conflictSquares.clear();
         updateTextStats();
+        updateSelectionUI();
+        renderDonations();
         return;
     }
 
@@ -997,23 +1024,26 @@ function updateTextPreview() {
     textModeData.zoom = donationMap.getZoom();
 
     // Convert text to squares
-    const squares = textToSquares(textModeData.text, textModeData.fontSize, textModeData.color);
+    const squares = textToSquares(textModeData.text, textModeData.fontSize, selectionSettings.color);
 
-    // Check for conflicts with donated squares
-    textModeData.squares.clear();
+    // Add new text squares to selection
+    // Track conflicts for warning display
     textModeData.conflictSquares.clear();
 
     squares.forEach(squareKey => {
         if (squareData[squareKey]) {
             textModeData.conflictSquares.add(squareKey);
         } else {
-            textModeData.squares.add(squareKey);
+            selectedSquares.add(squareKey); // Add to unified selection set
+            textModeData.textGeneratedSquares.add(squareKey); // Track it
         }
     });
 
-    // Render preview
+    // Render preview and update UI
     renderTextPreview();
     updateTextStats();
+    updateSelectionUI();
+    renderDonations();
 }
 
 function textToSquares(text, fontSize, color) {
@@ -1091,7 +1121,7 @@ function renderTextPreview() {
     // Clear existing preview
     clearTextPreview();
 
-    if (textModeData.squares.size === 0 && textModeData.conflictSquares.size === 0) {
+    if (textModeData.conflictSquares.size === 0) {
         return;
     }
 
@@ -1099,40 +1129,6 @@ function renderTextPreview() {
     const centerLat = donationMap.getCenter().lat;
     const meterInDegLat = 0.000009;
     const meterInDegLng = 0.000009 / Math.cos(centerLat * Math.PI / 180);
-
-    // Render available squares in selected color (same style as highlight view)
-    textModeData.squares.forEach(key => {
-        const [lat, lng] = key.split('_').map(n => n / 100000);
-
-        const squareBounds = [
-            [lat - meterInDegLat/2, lng - meterInDegLng/2],  // Southwest
-            [lat - meterInDegLat/2, lng + meterInDegLng/2],  // Southeast
-            [lat + meterInDegLat/2, lng + meterInDegLng/2],  // Northeast
-            [lat + meterInDegLat/2, lng - meterInDegLng/2],  // Northwest
-            [lat - meterInDegLat/2, lng - meterInDegLng/2]   // Close
-        ];
-
-        // Draw square polygon outline
-        const polygon = L.polygon(squareBounds, {
-            color: textModeData.color,
-            weight: 2,
-            fillColor: textModeData.color,
-            fillOpacity: 0.4,
-            className: 'text-preview-square-polygon'
-        }).addTo(donationMap);
-
-        // Draw circular marker at center (like highlight view)
-        const marker = L.circleMarker([lat, lng], {
-            radius: textModeData.pixelRadius,
-            fillColor: textModeData.color,
-            fillOpacity: 0.8,
-            color: textModeData.color,
-            weight: 2,
-            className: 'text-preview-square-marker'
-        }).addTo(donationMap);
-
-        textPreviewLayers.push(polygon, marker);
-    });
 
     // Render conflict squares in red (same style as highlight view)
     textModeData.conflictSquares.forEach(key => {
@@ -1177,9 +1173,7 @@ function clearTextPreview() {
 }
 
 function updateTextStats() {
-    const validCount = textModeData.squares.size;
     const conflictCount = textModeData.conflictSquares.size;
-    const total = validCount * SQUARE_PRICE;
 
     // Show/hide conflict warning (but don't block donation)
     const conflictWarning = document.getElementById('text-conflicts');
@@ -1189,11 +1183,6 @@ function updateTextStats() {
     } else {
         conflictWarning.classList.add('hidden');
     }
-
-    // Update donate button (allow donation even with conflicts)
-    document.getElementById('donate-btn').disabled = validCount === 0;
-    document.getElementById('selected-count').textContent = validCount;
-    document.getElementById('total-amount').textContent = total;
 }
 
 // Re-render highlighted squares (called after renderDonations to keep them on top)

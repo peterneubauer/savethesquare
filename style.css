@@ -441,6 +441,32 @@ body {
     margin-right: auto;
 }
 
+/* Shared selection controls (always visible) */
+.selection-controls {
+    background: white;
+    padding: 1rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    margin-bottom: 1rem;
+    display: flex;
+    gap: 2rem;
+    align-items: center;
+    justify-content: center;
+}
+
+.selection-control-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.selection-control-item label {
+    font-weight: 600;
+    color: var(--primary-green);
+    font-size: 0.9rem;
+    white-space: nowrap;
+}
+
 .text-overlay.hidden {
     display: none;
 }
@@ -474,7 +500,7 @@ body {
 
 .text-control-grid {
     display: grid;
-    grid-template-columns: auto 1fr 1fr 1fr;
+    grid-template-columns: 1fr 1fr;
     gap: 1rem;
     align-items: center;
 }
