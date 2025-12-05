@@ -401,12 +401,12 @@ body {
     font-size: 0.95rem;
 }
 
-/* Map Container */
+/* Map Container (always visible, even when controls are hidden) */
 #map-container {
     position: relative;
     width: 100%;
     max-width: 1100px;
-    margin: 0 auto 3rem;
+    margin: 2rem auto 3rem;
     border: 3px solid var(--accent-green);
     border-radius: 20px;
     overflow: hidden;
@@ -1458,6 +1458,71 @@ footer::before {
     100% {
         transform: scale(1);
     }
+}
+
+/* Donation Controls Container (can be hidden when viewing donations) */
+#donation-controls-container.hidden {
+    display: none;
+}
+
+/* Back to viewing button (hidden by default, subtle styling when shown) */
+#back-to-viewing-btn {
+    background: transparent;
+    color: var(--text-light);
+    border: 1px solid var(--border-color);
+    font-weight: 500;
+    font-size: 0.9rem;
+    padding: 0.6rem 1.5rem;
+    opacity: 0.8;
+    transition: all 0.3s ease;
+}
+
+#back-to-viewing-btn:hover:not(:disabled) {
+    background: var(--card-bg);
+    border-color: var(--text-light);
+    opacity: 1;
+    transform: none;
+}
+
+#back-to-viewing-btn.hidden {
+    display: none;
+}
+
+/* Donation Editor Toggle (shown when controls are hidden) */
+.donation-editor-toggle {
+    max-width: 1100px;
+    margin: 0 auto 2rem;
+    text-align: center;
+}
+
+.donation-editor-toggle .toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.5rem 3rem;
+    background: linear-gradient(135deg, var(--accent-green), var(--bright-green));
+    color: white;
+    border: none;
+    border-radius: 60px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 16px rgba(76, 175, 80, 0.35);
+}
+
+.donation-editor-toggle .toggle-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(76, 175, 80, 0.45);
+}
+
+.donation-editor-toggle .toggle-icon {
+    font-size: 1.5rem;
+}
+
+.donation-editor-toggle .toggle-label {
+    font-size: 1rem;
+    letter-spacing: 0.3px;
 }
 
 /* Leaflet marker styles for highlighted squares */

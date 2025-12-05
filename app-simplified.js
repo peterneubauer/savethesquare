@@ -56,12 +56,39 @@ function saveSettings() {
     localStorage.setItem('selectionSettings', JSON.stringify(settings));
 }
 
+// Wait for Leaflet to be ready (with timeout)
+let leafletWaitAttempts = 0;
+function waitForLeaflet(callback) {
+    leafletWaitAttempts++;
+
+    if (typeof L !== 'undefined') {
+        console.log('✅ Leaflet is ready!');
+        callback();
+    } else if (leafletWaitAttempts > 100) {
+        console.error('❌ Leaflet failed to load after 5 seconds');
+        console.error('Check Network tab for loading issues');
+        alert('Map library failed to load. Please refresh the page.');
+    } else {
+        if (leafletWaitAttempts === 1 || leafletWaitAttempts % 20 === 0) {
+            console.log(`⏳ Waiting for Leaflet... (attempt ${leafletWaitAttempts})`);
+        }
+        setTimeout(() => waitForLeaflet(callback), 50);
+    }
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('🚀 DOM Content Loaded');
+    console.log('Leaflet available?', typeof L !== 'undefined');
     loadSettings(); // Load saved settings
-    loadPropertyData();
-    checkPaymentStatus();
-    // checkHighlightParameter will be called after map is initialized
+
+    // Wait for Leaflet before loading property data (which initializes maps)
+    waitForLeaflet(() => {
+        console.log('🗺️ Starting to load property data...');
+        loadPropertyData();
+        checkPaymentStatus();
+        // checkHighlightParameter will be called after map is initialized
+    });
 });
 
 async function loadPropertyData() {
@@ -357,7 +384,10 @@ function renderDonations() {
     });
 
     // Re-render highlighted squares if they exist (to keep them on top)
-    rehighlightSquares();
+    // But only if we're NOT in editor mode
+    if (!editorMode) {
+        rehighlightSquares();
+    }
 }
 
 // Initialize location map (same as before)
@@ -446,8 +476,10 @@ function clearSelection() {
     if (currentMode === 'text') {
         document.getElementById('text-input').value = '';
         textModeData.text = '';
-        updateTextStats();
     }
+
+    // Always update text stats to hide conflict message
+    updateTextStats();
 
     updateSelectionUI();
     renderDonations();
@@ -945,6 +977,8 @@ function switchMode(mode) {
     // Just clear text preview when leaving text mode
     if (mode === 'click') {
         clearTextPreview();
+        textModeData.conflictSquares.clear();  // Clear conflicts
+        updateTextStats();  // Hide conflict message
     }
 
     updateSelectionUI();
@@ -959,30 +993,34 @@ function handleTextInput(e) {
 function handleColorChange(e) {
     selectionSettings.color = e.target.value;
     saveSettings();
-    renderDonations(); // Update all selected squares
-    if (currentMode === 'text') {
-        updateTextPreview();
-    }
+    // Update selected squares appearance
+    renderDonations();
+    // In text mode, the color doesn't affect text preview (conflicts are always red)
+    // but we still re-render to update selected squares
 }
 
 function handleFontSizeChange(e) {
     textModeData.fontSize = parseInt(e.target.value);
     saveSettings();
+    // Font size changes require full recalculation
     updateTextPreview();
 }
 
 function handlePixelDensityChange(e) {
     textModeData.pixelDensity = parseInt(e.target.value);
     saveSettings();
+    // Pixel density changes require full recalculation
     updateTextPreview();
 }
 
 function handlePixelRadiusChange(e) {
     selectionSettings.pixelRadius = parseInt(e.target.value);
     saveSettings();
-    renderDonations(); // Update all selected squares
-    if (currentMode === 'text') {
-        updateTextPreview();
+    // Update selected squares appearance
+    renderDonations();
+    // Update text preview to show conflict markers with new radius
+    if (currentMode === 'text' && textModeData.text.trim()) {
+        renderTextPreview();
     }
 }
 
@@ -1022,10 +1060,10 @@ function updateTextPreview() {
     });
 
     // Render preview and update UI
-    renderTextPreview();
     updateTextStats();
     updateSelectionUI();
     renderDonations();
+    renderTextPreview();  // Render conflict markers AFTER donations so they appear on top
 }
 
 function textToSquares(text, fontSize, color) {
@@ -1135,7 +1173,7 @@ function renderTextPreview() {
 
         // Draw circular marker at center
         const marker = L.circleMarker([lat, lng], {
-            radius: textModeData.pixelRadius,
+            radius: selectionSettings.pixelRadius,
             fillColor: '#dc3545',
             fillOpacity: 0.8,
             color: '#dc3545',
@@ -1156,14 +1194,19 @@ function clearTextPreview() {
 
 function updateTextStats() {
     const conflictCount = textModeData.conflictSquares.size;
+    const hasText = textModeData.text.trim().length > 0;
 
     // Show/hide conflict warning (but don't block donation)
     const conflictWarning = document.getElementById('text-conflicts');
-    if (conflictCount > 0) {
+
+    // Only show conflict warning if we're in text mode AND have text AND have conflicts
+    if (conflictCount > 0 && currentMode === 'text' && hasText) {
         conflictWarning.classList.remove('hidden');
         conflictWarning.textContent = `ℹ️ ${conflictCount} pixel hoppar över (redan donerade, visas röda) - inget problem!`;
     } else {
+        // Force hide - clear text content to ensure it's reset
         conflictWarning.classList.add('hidden');
+        conflictWarning.textContent = '';
     }
 }
 
@@ -1275,6 +1318,83 @@ function rehighlightSquares() {
     });
 }
 
+// Track if we're in viewing mode for a specific donation
+let viewingDonation = false;
+let editorMode = false; // Track if editor controls are shown
+
+// Show donation controls (called when user clicks toggle button)
+function showDonationControls() {
+    // Set editor mode flag FIRST before any rendering
+    editorMode = true;
+
+    document.getElementById('donation-controls-container').classList.remove('hidden');
+    document.getElementById('donation-editor-toggle').classList.add('hidden');
+
+    // Show back button if we're viewing a donation
+    if (viewingDonation) {
+        document.getElementById('back-to-viewing-btn').classList.remove('hidden');
+    }
+
+    // Update subtitle to donation mode
+    document.querySelector('.section-subtitle').textContent = 'Klicka på kartan nedan för att välja och donera din kvadratmeter av Visne Ängar';
+
+    // Clear text mode state (input, conflicts, preview)
+    document.getElementById('text-input').value = '';
+    textModeData.text = '';
+    textModeData.conflictSquares.clear();
+    textModeData.textGeneratedSquares.clear();
+    clearTextPreview();
+    updateTextStats();  // Hide conflict message
+
+    // If we were viewing a donation, clear the special highlighting
+    if (viewingDonation) {
+        // Remove ALL markers and polygons except property boundaries and inverse mask
+        const layersToRemove = [];
+        donationMap.eachLayer(layer => {
+            if ((layer instanceof L.CircleMarker || layer instanceof L.Polygon) &&
+                !layer.options.className?.includes('property-boundary') &&
+                !layer.options.className?.includes('inverse-mask')) {
+                layersToRemove.push(layer);
+            }
+        });
+        layersToRemove.forEach(layer => donationMap.removeLayer(layer));
+
+        // Re-render all donations as standard green squares (won't call rehighlightSquares because editorMode=true)
+        renderDonations();
+    }
+}
+
+// Hide donation controls and show viewing mode (called when user clicks back button)
+function hideDonationControls() {
+    // Clear editor mode flag FIRST
+    editorMode = false;
+
+    document.getElementById('donation-controls-container').classList.add('hidden');
+    document.getElementById('donation-editor-toggle').classList.remove('hidden');
+    document.getElementById('back-to-viewing-btn').classList.add('hidden');
+
+    // Update subtitle to viewing mode
+    if (highlightedDonationData) {
+        const donorName = highlightedDonationData.donor_name || highlightedDonationData.donor || 'En generös donator';
+        document.querySelector('.section-subtitle').textContent = `Visar donation från ${donorName}`;
+    }
+
+    // Remove all non-highlighted markers first
+    donationMap.eachLayer(layer => {
+        if ((layer instanceof L.CircleMarker || layer instanceof L.Polygon) &&
+            !layer.options.className?.includes('highlighted') &&
+            !layer.options.className?.includes('property-boundary') &&
+            !layer.options.className?.includes('inverse-mask')) {
+            donationMap.removeLayer(layer);
+        }
+    });
+
+    // Restore highlighted squares with custom styling
+    if (viewingDonation && highlightedSquares.length > 0) {
+        rehighlightSquares();
+    }
+}
+
 // Check if URL has highlight parameter to show specific donated squares
 async function checkHighlightParameter() {
     const urlParams = new URLSearchParams(window.location.search);
@@ -1300,6 +1420,17 @@ async function checkHighlightParameter() {
                 highlightedDonationData = data.donation; // Store full donation including mode_data
                 console.log('Loaded donation:', highlightedDonationData);
                 console.log('Squares:', highlightedSquares.length);
+
+                // Set viewing mode flag
+                viewingDonation = true;
+
+                // Hide donation controls, show toggle button
+                document.getElementById('donation-controls-container').classList.add('hidden');
+                document.getElementById('donation-editor-toggle').classList.remove('hidden');
+
+                // Update subtitle to viewing mode
+                const donorName = highlightedDonationData.donor_name || highlightedDonationData.donor || 'En generös donator';
+                document.querySelector('.section-subtitle').textContent = `Visar donation från ${donorName}`;
             } else {
                 console.error('Failed to fetch donation:', response.status);
                 return;

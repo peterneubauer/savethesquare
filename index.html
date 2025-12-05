@@ -61,8 +61,18 @@
                 <h2 class="section-title">Välj din kvadratmeter</h2>
                 <p class="section-subtitle">Klicka på kartan nedan för att välja och donera din kvadratmeter av Visne Ängar</p>
 
-                <!-- Mode Toggle -->
-                <div class="mode-toggle-container">
+                <!-- Donation Editor Toggle (shown when controls are hidden) -->
+                <div id="donation-editor-toggle" class="donation-editor-toggle hidden">
+                    <button onclick="showDonationControls()" class="toggle-btn">
+                        <span class="toggle-icon">✏️</span>
+                        <span class="toggle-label">Klicka här för att börja donera egna kvadratmeter</span>
+                    </button>
+                </div>
+
+                <!-- Donation Controls Container (can be hidden) -->
+                <div id="donation-controls-container">
+                    <!-- Mode Toggle -->
+                    <div class="mode-toggle-container">
                     <button id="click-mode-btn" class="mode-btn active">
                         <span class="mode-icon">👆</span>
                         <span class="mode-label">Klick-läge</span>
@@ -117,16 +127,20 @@
                     </div>
                 </div>
 
-                <div id="map-container">
-                    <div id="donation-map-leaflet"></div>
-                </div>
-
                 <div class="selection-controls">
                     <button id="donate-btn" class="btn-primary" disabled>
                         Donera <span id="selected-count">0</span> kvadratmeter (<span id="total-amount">0</span> SEK)
                     </button>
                     <button id="clear-selection-btn" class="btn-secondary" disabled>Rensa val</button>
+                    <button id="back-to-viewing-btn" class="btn-secondary hidden" onclick="hideDonationControls()">Tillbaka till visning</button>
                 </div>
+            </div>
+            <!-- End of donation-controls-container -->
+
+            <!-- Map Container (always visible) -->
+            <div id="map-container">
+                <div id="donation-map-leaflet"></div>
+            </div>
             </div>
         </section>
 
@@ -331,7 +345,7 @@
         </div>
     </div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="https://js.stripe.com/v3/"></script>
     <script src="config.js"></script>
     <script src="app-simplified.js"></script>
