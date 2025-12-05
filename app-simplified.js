@@ -9,6 +9,7 @@ let donationMap = null;
 let propertyData = null;
 let canvasOverlay = null;
 let highlightedSquares = []; // Store highlighted square keys for re-rendering
+let highlightedDonationData = null; // Store mode_data from highlighted donation
 
 // Selection settings (shared between modes)
 let selectionSettings = {
@@ -325,37 +326,18 @@ function renderDonations() {
     for (const [key, data] of Object.entries(squareData)) {
         const [lat, lng] = key.split('_').map(n => n / 100000);
 
-        // Check if this is a text-mode donation
-        if (data.mode === 'text') {
-            // Render as colored square polygon
-            const squareBounds = [
-                [lat - meterInDegLat/2, lng - meterInDegLng/2],
-                [lat - meterInDegLat/2, lng + meterInDegLng/2],
-                [lat + meterInDegLat/2, lng + meterInDegLng/2],
-                [lat + meterInDegLat/2, lng - meterInDegLng/2],
-                [lat - meterInDegLat/2, lng - meterInDegLng/2]
-            ];
-
-            L.polygon(squareBounds, {
-                color: data.color || '#FFD700',
-                weight: 1,
-                fillColor: data.color || '#FFD700',
-                fillOpacity: 0.8,
-                className: 'donated-text-square'
-            }).addTo(donationMap).bindPopup(`Donerad av: ${data.donor}<br><small>Text: "${data.text}"</small>`);
-        } else {
-            // Render as green circle marker (click mode)
-            L.circleMarker([lat, lng], {
-                radius: 6,
-                fillColor: '#27ae60',
-                fillOpacity: 0.95,
-                stroke: true,
-                color: '#1e8449',
-                weight: 2,
-                opacity: 1,
-                className: 'donated-click-square'
-            }).addTo(donationMap).bindPopup(`Donerad av: ${data.donor}`);
-        }
+        // Always render as green circle markers (default view)
+        // Custom colors are only shown when viewing specific donation via donation_id
+        L.circleMarker([lat, lng], {
+            radius: 6,
+            fillColor: '#27ae60',
+            fillOpacity: 0.95,
+            stroke: true,
+            color: '#1e8449',
+            weight: 2,
+            opacity: 1,
+            className: 'donated-square'
+        }).addTo(donationMap).bindPopup(`Donerad av: ${data.donor}${data.text ? `<br><small>Text: "${data.text}"</small>` : ''}`);
     }
 
     // Draw selected squares (both modes - use selectionSettings for appearance)
@@ -1191,15 +1173,22 @@ function rehighlightSquares() {
 
     console.log('rehighlightSquares called with', highlightedSquares.length, 'squares');
 
+    // Get color and radius from highlighted donation data (if available)
+    const modeData = highlightedDonationData?.mode_data || {};
+    const customColor = modeData.color || '#FFD700';
+    const borderColor = modeData.color || '#FF4500';
+    const markerRadius = modeData.pixelRadius || 12;
+
+    console.log('=== HIGHLIGHT RENDERING ===');
+    console.log('highlightedDonationData:', highlightedDonationData);
+    console.log('mode_data:', modeData);
+    console.log('customColor:', customColor);
+    console.log('borderColor:', borderColor);
+    console.log('markerRadius:', markerRadius);
+
     highlightedSquares.forEach((key, index) => {
         const [lat, lng] = key.split('_').map(n => n / 100000);
         console.log(`Highlighting square ${index + 1}:`, key, '→', lat, lng);
-
-        // Get square data to check if it's a text-mode donation with custom color
-        const squareInfo = squareData[key];
-        const isTextMode = squareInfo && squareInfo.mode === 'text';
-        const customColor = isTextMode ? squareInfo.color : '#FFD700';
-        const borderColor = isTextMode ? squareInfo.color : '#FF4500';
 
         // Calculate square boundaries (approximately 1 meter square)
         // At this latitude, 1 meter ≈ 0.000009 degrees latitude
@@ -1228,10 +1217,10 @@ function rehighlightSquares() {
 
         // Create large clickable marker at center
         const highlightMarker = L.circleMarker([lat, lng], {
-            radius: 12,            // Larger radius for easier clicking
-            fillColor: customColor,  // Custom color for text mode, gold otherwise
+            radius: markerRadius,   // Use radius from mode_data
+            fillColor: customColor,  // Custom color from mode_data
             fillOpacity: 0.9,
-            color: borderColor,      // Custom color for text mode, orange-red otherwise
+            color: borderColor,      // Border color from mode_data
             weight: 4,
             className: 'highlighted-square-marker',
             pane: 'markerPane'
@@ -1240,13 +1229,23 @@ function rehighlightSquares() {
         // Add popup with donor info if available
         let popupContent;
 
-        if (squareInfo) {
-            const donorName = squareInfo.donor || squareInfo.donorName || 'Anonym';
-            const greeting = squareInfo.greeting || squareInfo.donorGreeting;
+        // Use highlighted donation data if available, otherwise fall back to squareInfo
+        const donorInfo = highlightedDonationData || squareData[key];
+
+        if (donorInfo) {
+            const donorName = donorInfo.donor_name || donorInfo.donor || donorInfo.donorName || 'Anonym';
+            const greeting = donorInfo.donor_greeting || donorInfo.greeting || donorInfo.donorGreeting;
+            const textContent = modeData.text;
 
             popupContent = `<div style="text-align: center; padding: 12px; max-width: 250px;">
                 <b style="color: #1a5d1a; font-size: 16px;">✨ Din Kvadrat! ✨</b><br>
                 <span style="color: #666; font-size: 14px; margin-top: 4px; display: block;">Donerad av: <strong>${donorName}</strong></span>`;
+
+            if (textContent) {
+                popupContent += `<div style="margin-top: 8px; padding: 8px; background: #fff8dc; border-radius: 4px; font-weight: bold; color: ${modeData.color}; font-size: 14px;">
+                    "${textContent}"
+                </div>`;
+            }
 
             if (greeting) {
                 popupContent += `<div style="margin-top: 8px; padding: 8px; background: #f0f7f0; border-radius: 4px; font-style: italic; color: #2d5016; font-size: 13px;">
@@ -1298,7 +1297,9 @@ async function checkHighlightParameter() {
             if (response.ok) {
                 const data = await response.json();
                 highlightedSquares = data.squares || [];
-                console.log('Loaded squares from donation:', highlightedSquares);
+                highlightedDonationData = data.donation; // Store full donation including mode_data
+                console.log('Loaded donation:', highlightedDonationData);
+                console.log('Squares:', highlightedSquares.length);
             } else {
                 console.error('Failed to fetch donation:', response.status);
                 return;
